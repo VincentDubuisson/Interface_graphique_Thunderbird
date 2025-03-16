@@ -1,0 +1,29 @@
+{
+    "manifest_version": 2,
+    "name": "Diallo ",
+    "version": "1.0",
+    "description": "Extension pour récupérer tous les emails",
+    "permissions": [
+      "messagesRead",
+      "accountsRead",
+      "accountsFolders"
+      
+    ],
+    "background": {
+      "scripts": ["background.js"]
+    },
+    "browser_action": {
+      "default_popup": "popup/popup.html",
+      "default_icon": {
+        "16": "icon.png",
+        "48": "icon.png",
+        "128": "icon.png"
+      }
+    },
+    "applications": {
+      "gecko": {
+        "id": "diallo.mbobo.108@ut3.fr"
+      }
+    }
+  }
+  
