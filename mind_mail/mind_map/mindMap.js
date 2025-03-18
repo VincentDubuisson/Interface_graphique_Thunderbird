@@ -1,6 +1,8 @@
 import MindElixir from '../node_modules/mind-elixir/dist/MindElixir.js';
 import nodeMenu from '../node_modules/@mind-elixir/node-menu-neo/dist/node-menu-neo.js';
 import { saveMindMap } from './saveMindMap.js';
+import { getNodeNames } from "../globals/globals.js";
+
 
 document.addEventListener("DOMContentLoaded", function () {
     let mind = new MindElixir({
@@ -12,7 +14,7 @@ document.addEventListener("DOMContentLoaded", function () {
         nodeMenu: true,
         keypress: true,
         locale: "fr",
-        mainLinkStyle: 1,
+        mainLinkStyle: 2,
         mouseSelectionButton: 0,
         contextMenuOption: {
             focus: true,
@@ -44,6 +46,9 @@ document.addEventListener("DOMContentLoaded", function () {
     // Écoute les événements de modification (ajout, suppression, déplacement de noeuds, ...)
     mind.bus.addListener('operation', operation => {
         saveMindMap(window.mind.getData());
+
+        // Test affichage de la structure (hiérarchie) des noms des noeuds
+        console.log("Noms des nœuds (en mémoire) :", getNodeNames());
     });
 
     // Réinitialise la carte mentale
