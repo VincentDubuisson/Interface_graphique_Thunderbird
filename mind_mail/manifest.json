@@ -1,32 +1,29 @@
 {
     "manifest_version": 2,
-    "name": "Mind Mail",
-    "description": "Texte personnalisable",
+    "name": "MindMapData ",
     "version": "1.0",
-    "author": "Thunderbird Team",
-    "browser_specific_settings": {
-        "gecko": {
-            "id": "mindmail@ut3.fr",
-            "strict_min_version": "115.0"
-        }
+    "description": "Stockage des mails",
+    "permissions": [
+      "messagesRead",
+      "accountsRead",
+      "accountsFolders"
+      
+    ],
+    "background": {
+      "scripts": ["background.js"]
     },
     "browser_action": {
-        "default_title": "Mind Mail",
-        "default_icon": "images/internet-32px.png"
+      "default_popup": "popup/popup.html",
+      "default_icon": {
+        "16": "icon.png",
+        "48": "icon.png",
+        "128": "icon.png"
+      }
     },
-    "icons": {
-        "64": "images/internet.png",
-        "32": "images/internet-32px.png",
-        "16": "images/internet-16px.png"
-    },
-    "background": {
-        "scripts": ["background.js"],
-        "persistent": true
-    },
-    "permissions": [
-        "tabs",
-        "storage",
-        "messagesRead",
-        "activeTab"
-    ]
-}
+    "applications": {
+      "gecko": {
+        "id": "dd@ut3.com"
+      }
+    }
+  }
+  
