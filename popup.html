@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Email Viewer</title>
+    <style>
+        body {
+            width: 350px;
+            height: 500px;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+        h3 {
+            margin-top: 0;
+            color: #0c0c0d;
+            border-bottom: 1px solid #d7d7db;
+            padding-bottom: 8px;
+        }
+        #emails {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+            max-height: 450px;
+            overflow-y: auto;
+        }
+        .email-item {
+            margin: 8px 0;
+            padding: 10px;
+            border: 1px solid #d7d7db;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .email-item:hover {
+            background-color: #f0f0f4;
+        }
+        .received {
+            border-left: 3px solid #0060df;
+        }
+        .sent {
+            border-left: 3px solid #12bc00;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #737373;
+        }
+        .error {
+            color: #d70022;
+            padding: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h3>Email Viewer</h3>
+    <ul id="emails">
+        <li class="loading">Chargement en cours...</li>
+    </ul>
+
+    <script src="mail_recu_envoyes.js"></script>
+    <script>
+        // Vérification de l'environnement
+        if (typeof browser === 'undefined' && typeof chrome !== 'undefined') {
+            window.browser = chrome;
+        }
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('[Email Viewer] Extension loaded');
+            
+            if (typeof displayEmails === 'function') {
+                displayEmails();
+            } else {
+                document.getElementById('emails').innerHTML = 
+                    '<li class="error">Erreur: Impossible de charger les fonctions</li>';
+                console.error('displayEmails() non disponible');
+            }
+        });
+    </script>
+</body>
+</html>
+
+<style>
+    .pagination {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 15px;
+        margin-top: 20px;
+        padding: 10px 0;
+        border-top: 1px solid #eee;
+    }
+    .pagination button {
+        padding: 5px 10px;
+        min-width: 80px;
+    }
+    .pagination button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    .page-info {
+        font-size: 0.9em;
+        color: #666;
+    }
+</style>
