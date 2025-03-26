@@ -1,29 +1,29 @@
 {
     "manifest_version": 2,
-    "name": "Diallo ",
+    "name": "Email Viewer",
     "version": "1.0",
-    "description": "Extension pour récupérer tous les emails",
+    "description": "Affiche les emails reçus et envoyés",
+    "icons": {
+        "48": "icon.png"
+    },
     "permissions": [
-      "messagesRead",
-      "accountsRead",
-      "accountsFolders"
-      
+        "accountsRead", 
+        "accountsRead",
+        "messagesRead",
+        "foldersRead"
     ],
     "background": {
-      "scripts": ["background.js"]
+        "scripts": ["mail_recu_envoyes.js"],
+        "persistent": false
     },
     "browser_action": {
-      "default_popup": "popup/popup.html",
-      "default_icon": {
-        "16": "icon.png",
-        "48": "icon.png",
-        "128": "icon.png"
-      }
+        "default_popup": "popup.html",
+        "default_icon": "icon.png"
     },
     "applications": {
-      "gecko": {
-        "id": "diallo.mbobo.108@ut3.fr"
-      }
+        "gecko": {
+            "id": "diallo.mbobo.108@ut3.fr",
+            "strict_min_version": "78.0"
+        }
     }
-  }
-  
+}
