@@ -12,6 +12,8 @@ export async function executeRecupEmails() {
         console.log(`Email contenant ${mot} : \n\n`);
         await recupEmails(mot); 
     }
+
+    await initMainFolder(); 
 }
 
 export async function initAccount() {
@@ -69,5 +71,34 @@ async function explorerDossiers(folders, filter) {
         if (folder.subFolders && folder.subFolders.length > 0) {
             await explorerDossiers(folder.subFolders, filter);
         }
+    }
+}
+
+async function initMainFolder(mailAdress = "none") {
+
+    let account; 
+
+    if (mailAdress == "none") account = accounts[0]; // Select the first account
+     
+    
+    else {
+        for (let acc of accounts) {
+            if (acc.name == mailAdress) account = acc
+        }
+    }
+
+   
+
+    if (!account) {
+        console.error("No account found.");
+        return;
+    }
+
+    try {
+        let folder = await browser.folders.create(account, "MindMail");
+
+        console.log("Folder created:", folder.path, "dans le compte ", account);
+    } catch (error) {
+        console.error("Error creating folder:", error);
     }
 }
