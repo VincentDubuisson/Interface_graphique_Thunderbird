@@ -6,7 +6,6 @@ let accounts;
 export async function executeRecupEmails() {
     await initAccount();
     let mon_arborescence = await getLeafNodes();
-    console.log("Mon arborescence :", mon_arborescence);
 
     for (let mot of mon_arborescence) {
         console.log(`Email contenant ${mot} : \n\n`);

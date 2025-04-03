@@ -1,10 +1,8 @@
-import { extractNodeNames } from '../mind_map/saveMindMap.js';
-
 export async function getSavedMindMap() {
     try {
         let result = await browser.storage.local.get("mindmap");
         if (result.mindmap) {
-            return extractNodeNames(JSON.parse(result.mindmap)); // Retourne la carte mentale sous forme d'objet JSON
+            return JSON.parse(result.mindmap); // Retourne la carte mentale sous forme d'objet JSON
         } else {
             return null; // Aucune carte mentale sauvegardée
         }
