@@ -1,11 +1,13 @@
 import { getSavedMindMap } from "../mind_map/loadMindMap.js";
+import { extractNodeNames } from '../mind_map/saveMindMap.js';
 
 export async function getLeafNodes() {
     // Attendre que la promesse se résolve et obtenir la carte mentale
-    let tree = await getSavedMindMap();
+    let mindMapData = await getSavedMindMap();
+    let tree = extractNodeNames(mindMapData);
 
     // Vérifier si l'arbre est bien défini et une structure valide
-    console.log("Arbre récupéré :", tree);
+    console.log("Arbre des noms de noeuds récupéré :", tree);
 
     let leaves = [];
 
@@ -33,3 +35,36 @@ export async function getLeafNodes() {
     // Retourne le tableau des feuilles
     return leaves;
 }
+
+export async function getTags(name_leaf) {
+    let mindMapData = await getSavedMindMap();
+
+    if (!mindMapData || !mindMapData.nodeData) {
+        console.error("Données invalides reçues :", mindMapData);
+        return null;
+    }
+
+    function searchTags(node) {
+        if (!node || !node.topic) return null;
+
+        // Si on trouve le bon nœud, on retourne ses tags
+        if (node.topic === name_leaf) {
+            return node.tags || [];
+        }
+
+        // Recherche récursive dans les enfants
+        if (node.children && Array.isArray(node.children)) {
+            for (let child of node.children) {
+                let result = searchTags(child);
+                if (result !== null) {
+                    return result; // On arrête dès qu'on trouve
+                }
+            }
+        }
+
+        return null; // Si aucun nœud ne correspond
+    }
+
+    return searchTags(mindMapData.nodeData);
+}
+

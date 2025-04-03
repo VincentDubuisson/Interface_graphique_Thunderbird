@@ -2,7 +2,7 @@
 export function saveMindMap(mindMapData) {
 
     // Export des noms des noeuds et tags selon la hiérarchie
-    const nodeNames = extractNodeNames(mindMapData);
+    const nodeNames = extractNodeAndTagNames(mindMapData);
 
     // Sauvegarde dans stockage local
     browser.storage.local.set({ "mindmap": JSON.stringify(mindMapData) })
@@ -16,6 +16,32 @@ export function saveMindMap(mindMapData) {
 
 // Extrait les noeuds et tags de la carte mentale selon la hiérarchie
 export function extractNodeNames(mindMapData) {
+    if (!mindMapData || !mindMapData.nodeData) {
+        console.error("Données invalides reçues :", mindMapData);
+        return {};
+    }
+
+    function traverse(node) {
+        if (!node || !node.topic) {
+            return {};  // Si le nœud est invalide, retourne un objet vide
+        }
+
+        let result = {}; // Objet pour stocker les enfants
+
+        if (node.children && Array.isArray(node.children)) {
+            node.children.forEach(child => {
+                result[child.topic] = traverse(child); // Ajout récursif des enfants
+            });
+        }
+
+        return result;
+    }
+
+    return traverse(mindMapData.nodeData); // Démarrer à partir de la racine
+}
+
+// Extrait les noeuds et tags de la carte mentale selon la hiérarchie
+export function extractNodeAndTagNames(mindMapData) {
     if (!mindMapData || !mindMapData.nodeData) {
         console.error("Données invalides reçues :", mindMapData);
         return {};
