@@ -1,4 +1,4 @@
-import { getLeafNodes } from "./extractTerminalNodesName.js";
+import { getLeafNodes , getTags} from "./extractTerminalNodesName.js";
 
 let accounts;
 
@@ -12,12 +12,30 @@ export async function executeRecupEmails() {
         await recupEmails(mot); 
     }
 
+    // let tags_leaf1 = await getTags("leaf1"); 
+    // let real_tags_leaf1 = tags_leaf1[0].split(" ");
+    // console.log(real_tags_leaf1); 
+
+    await createSubFolder(); 
     await initMainFolder(); 
+    
+
+    // let leafNodes = getLeafNodes(); 
+    // for(let leaf of leafNodes) {
+    //     console.log(leaf); 
+    // }
+    
+   
+
+    
 }
 
 export async function initAccount() {
     accounts = await browser.accounts.list();
-    console.log(`📬 Nombre de comptes trouvés : ${accounts.length}`);       
+    console.log(`📬 Nombre de comptes trouvés : ${accounts.length}`);
+    for (let account of accounts) {
+        console.log(account.name); 
+    }       
 }
 
 export async function recupEmails(filter) {
@@ -74,30 +92,53 @@ async function explorerDossiers(folders, filter) {
 }
 
 async function initMainFolder(mailAdress = "none") {
-
     let account; 
-
     if (mailAdress == "none") account = accounts[0]; // Select the first account
-     
-    
     else {
         for (let acc of accounts) {
             if (acc.name == mailAdress) account = acc
         }
     }
-
-   
-
     if (!account) {
         console.error("No account found.");
         return;
     }
-
     try {
-        let folder = await browser.folders.create(account, "MindMail");
+        let folder = await browser.folders.create(account.rootFolder.id, "MindMail");
 
         console.log("Folder created:", folder.path, "dans le compte ", account);
     } catch (error) {
         console.error("Error creating folder:", error);
     }
+}
+
+async function createSubFolder() {
+    let leaves = []; 
+    let leavesNodes = await getLeafNodes();
+    for (let leaf of leavesNodes) {
+        console.log(leaf); 
+    } 
+
+
+    // let account; 
+    // if (mailAdress == "none") account = accounts[0]; // Select the first account
+    // else {
+    //     for (let acc of accounts) {
+    //         if (acc.name == mailAdress) account = acc
+    //     }
+    // }
+    // if (!account) {
+    //     console.error("No account found.");
+    //     return;
+    // }
+    // try {
+    //     let folder = await browser.folders.create(account.rootFolder, "MindMail");
+
+    //     console.log("Folder created:", folder.path, "dans le compte ", account);
+    // } catch (error) {
+    //     console.error("Error creating folder:", error);
+    // }
+   
+
+    
 }
