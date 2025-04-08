@@ -30,7 +30,8 @@
       "tabs",
       "storage",
       "messagesRead",
-      "activeTab"
+      "activeTab",
+      "messagesMove",
+      "notifications"
   ]
 }
-  
