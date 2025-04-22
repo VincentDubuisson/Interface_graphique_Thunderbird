@@ -1,12 +1,14 @@
-import { getLeafNodes , getTags, getTagHierarchy } from "./extractTerminalNodesName.js";
 import { extractNodeNames } from '../mind_map/saveMindMap.js';
 import { getSavedMindMap } from "../mind_map/loadMindMap.js";
 
 let accounts;
+let folderNodeMap = {}
 
 
 // Fonction principale qui initialise le système et lance la récupération des mails
 export async function executeRecupEmails() {
+
+    clearStoredFoldersData();
     
     await initAccount(); // Récupération des comptes mail disponibles
     await initMainFolder(); // Création du dossier principal "MindMail"
@@ -21,7 +23,7 @@ export async function executeRecupEmails() {
     console.log(`Nombre total de mails récupérés : ${allMails.length}`);
 
     // Lance le parcours de la carte mentale pour trier les mails
-    await browseNode(mindMapData.nodeData, allMails);
+    await browseNode(mindMapData.nodeData, allMails, "MindMail", true);
 }
 
 
@@ -29,7 +31,7 @@ export async function executeRecupEmails() {
 // Récupère la liste des comptes de messagerie configurés
 export async function initAccount() {
     accounts = await browser.accounts.list();
-    console.log(`📬 Nombre de comptes trouvés : ${accounts.length}`);
+    console.log(`Nombre de comptes trouvés : ${accounts.length}`);
     for (let account of accounts) {
         console.log(account.name); 
     }       
@@ -76,8 +78,7 @@ async function getAllMails() {
 }
 
 
-// Parcourt récursivement la carte mentale pour trier les mails selon les tags
-async function browseNode(node, baseMails) {
+async function browseNode(node, baseMails, path = "", isRoot = false) {
     const normalizeTag = tag => tag.trim().toLowerCase();
     const ownTags = (node.tags || []).map(normalizeTag);
     const hasTags = ownTags.length > 0;
@@ -85,38 +86,58 @@ async function browseNode(node, baseMails) {
     let totalMessages = 0;
     const filteredMails = [];
 
+    const nodePath = isRoot ? "MindMail" : `${path}${node.topic}`;
+    const fullPath = `${nodePath}`;
+    const folderId = folderNodeMap[`${nodePath}`] || folderNodeMap[`Dossiers locaux/${nodePath}`];
+    const alreadyCopiedIds = folderId ? await loadCopiedMailIds(fullPath) : [];
+
     if (hasTags) {
-        // Si le nœud contient des tags, on filtre les mails correspondants
         for (let mail of baseMails) {
             const subject = mail.subject?.toLowerCase() || "";
             const author = mail.author?.toLowerCase() || "";
 
-            const hasMatchingTag = ownTags.some(tag => {
-                return tag === "all" || subject.includes(tag) || author.includes(tag);
-            });
+            const hasMatchingTag = ownTags.some(tag =>
+                tag === "all" || subject.includes(tag) || author.includes(tag)
+            );
 
             if (hasMatchingTag) {
-                console.log(`    📧 ${mail.subject} - ${mail.author}`);
+                if (alreadyCopiedIds.includes(mail.id)) {
+                    console.log(`Mail déjà présent dans '${fullPath}' → Ignoré : ${mail.subject}`);
+                    continue;
+                }
+
+                console.log(`     ${mail.subject} - ${mail.author}`);
                 filteredMails.push(mail);
                 totalMessages++;
+
+                // Copie le mail et stocke son ID
+                if (folderId) {
+                    try {
+                        await browser.messages.copy([mail.id], folderId);
+                        await saveCopiedMailId(fullPath, mail.id);
+                        console.log(`    ✉️ Copié dans '${fullPath}'`);
+                    } catch (copyError) {
+                        console.error(`Erreur lors de la copie dans '${fullPath}' :`, copyError);
+                    }
+                } else {
+                    console.warn(`Dossier introuvable pour '${fullPath}'`);
+                }
             }
         }
 
         if (totalMessages > 0) {
-            console.log(`✅ Noeud "${node.topic}" avec tags: ${ownTags.join(", ")} → ${totalMessages} mails trouvés.`);
+            console.log(`"${node.topic}" (${ownTags.join(", ")}) → ${totalMessages} nouveaux mails.`);
         } else {
-            console.log(`❌ Aucun mail trouvé pour le noeud "${node.topic}" avec les tags : ${ownTags.join(", ")}`);
+            console.log(`Aucun nouveau mail pour "${node.topic}"`);
         }
     } else {
-        // Si pas de tags, on transmet tous les mails aux enfants sans filtrage
         filteredMails.push(...baseMails);
-        console.log(`➡️  Noeud "${node.topic}" sans tag → mails transmis aux enfants sans filtrage`);
+        console.log(`"${node.topic}" sans tag → mails transmis aux enfants`);
     }
 
-    // Appel récursif sur les enfants du nœud
     if (node.children && node.children.length > 0) {
         for (let child of node.children) {
-            await browseNode(child, filteredMails);
+            await browseNode(child, filteredMails, `${nodePath}/`);
         }
     }
 }
@@ -159,8 +180,7 @@ async function initMainFolder(mailAdress = "none") {
  }
 
 
-// Créer tous les sous-dossiers correspondant aux noeuds de la carte mentale
-async function createSubFolder(mailAdress = "none") {
+ async function createSubFolder(mailAdress = "none") {
     let account;
 
     if (mailAdress === "none") {
@@ -179,43 +199,51 @@ async function createSubFolder(mailAdress = "none") {
         return;
     }
 
-    // Récupère la structure hiérarchique des nœuds à partir de la carte mentale
     const tree = extractNodeNames(await getSavedMindMap());
     console.log("Arborescence à créer :", tree);
 
-    // Lance la création des dossiers
-    await createMindMapFolders(tree, mindMailFolder.id);
+    folderNodeMap = await createMindMapFolders(tree, mindMailFolder.id); // Stockage global
 }
 
 
-// Créer récursivement les dossiers et sous-dossiers selon l’arborescence de la carte mentale
-async function createMindMapFolders(tree, parentFolderId) {
-    // Récupère les dossiers enfants existants
+async function createMindMapFolders(tree, parentFolderId, parentPath = "") {
+    const folderMap = {};
     const parentInfo = await browser.folders.getSubFolders(parentFolderId);
     const existingNames = parentInfo.map(f => f.name);
 
     for (let nodeName in tree) {
-        try {
-            const safeName = nodeName.replace(/[\\/:"*?<>|]+/g, "_");
+        const safeName = nodeName.replace(/[\\/:"*?<>|]+/g, "_");
+        let folderId;
+        let newFolder;
 
-            // Vérifie si le dossier existe déjà
+        try {
             if (existingNames.includes(safeName)) {
-                console.log(`Le dossier '${safeName}' existe déjà, création ignorée.`);
                 const existingFolder = parentInfo.find(f => f.name === safeName);
-                await createMindMapFolders(tree[nodeName], existingFolder.id); // Appel récursif même si le dossier existe
-                continue;
+                folderId = existingFolder.id;
+                console.log(`Le dossier '${safeName}' existe déjà.`);
+            } else {
+                newFolder = await browser.folders.create(parentFolderId, safeName);
+                folderId = newFolder.id;
+                console.log("Dossier créé :", newFolder.path);
             }
 
-            // Crée le dossier si inexistant
-            const newFolder = await browser.folders.create(parentFolderId, safeName);
-            console.log("Dossier créé :", newFolder.path);
+            const fullPath = `MindMail/${parentPath}${nodeName}`;
+            folderMap[fullPath] = folderId;
+            if (newFolder) folderMap[newFolder.path] = folderId;
 
-            // Appel récursif pour les sous-dossiers
-            await createMindMapFolders(tree[nodeName], newFolder.id);
+            // Appel récursif pour les enfants
+            const children = tree[nodeName];
+            if (children && Object.keys(children).length > 0) {
+                const subMap = await createMindMapFolders(children, folderId, `${parentPath}${nodeName}/`);
+                Object.assign(folderMap, subMap);
+            }
+
         } catch (err) {
             console.error(`Erreur création dossier '${nodeName}':`, err);
         }
     }
+
+    return folderMap;
 }
 
 
@@ -235,118 +263,6 @@ async function getMindMailFolder(account) {
 }
 
 
-
-async function reset(mailAdress="none") {
-    let account;
-
-    if (mailAdress === "none") {
-        account = accounts[0]; 
-    } else {
-        for (let acc of accounts) {
-            if (acc.name === mailAdress) {
-                account = acc;  
-                break;
-            }
-        }
-    }
-
-    let fullAccount = await browser.accounts.get(account.id);
-        let rootFolders = fullAccount.folders;
-    
-        for (let folder of rootFolders) {
-            if (folder.name === "MindMail") {
-                await browser.folders.delete(folder.id);
-                return; 
-            }
-        }
-    
-        console.warn("📂 Le dossier 'MindMail' n'a pas été trouvé.");
-        
-    
-
-}
-
-    // let account; 
-    // if (mailAdress == "none") account = accounts[0]; // Select the first account
-    // else {
-    //     for (let acc of accounts) {
-    //         if (acc.name == mailAdress) account = acc
-    //     }
-    // }
-    // if (!account) {
-    //     console.error("No account found.");
-    //     return;
-    // }
-    // try {
-    //     let folder = await browser.folders.create(account.rootFolder, "MindMail");
-
-    //     console.log("Folder created:", folder.path, "dans le compte ", account);
-    // } catch (error) {
-    //     console.error("Error creating folder:", error);
-    // }
-   
-
-
-  
-// Fonction pour vérifier si un email est classé
-function isEmailClassified(message) {
-    // Logique pour vérifier si l'email est classé
-    // Par exemple, vérifier un champ spécifique ou une étiquette
-    // Retourner true si classé, sinon false
-    return message.tags && message.tags.length > 0; // Exemple de vérification
-  }
-
-  // Fonction pour déplacer l'email dans le dossier "non classés"
-async function moveToNonClassesFolder(message, accountId) {
-    try {
-        // Obtenir ou créer le dossier "non classés"
-        let nonClassesFolder = await getOrCreateNonClassesFolder(accountId);
-  
-        // Déplacer l'email
-        await browser.messages.move([message.id], nonClassesFolder.id);
-        console.log(`📥 Email déplacé vers le dossier "non classés" : ${message.subject}`);
-    } catch (error) {
-        console.error(`❌ Erreur lors du déplacement de l'email : ${message.subject}`, error);
-    }
-  }
-  
-  async function getOrCreateNonClassesFolder(accountId) {
-    let account = await browser.accounts.get(accountId);
-  
-    // Find the "Inbox" folder
-    let inboxFolder = account.folders.find(folder => folder.name === "Inbox");
-    if (!inboxFolder) {
-      console.error("❌ Inbox folder not found.");
-      return null;
-    }
-    // Check for the "non classés" subfolder within "Inbox"
-  let nonClassesFolder = inboxFolder.subFolders.find(folder => folder.name === "non classés");
-
-  if (!nonClassesFolder) {
-    try {
-      // Create the "non classés" subfolder under "Inbox"
-      nonClassesFolder = await browser.folders.create(inboxFolder.id, "non classés");
-      console.log(`📁 Dossier "non classés" créé sous Inbox.`);
-    } catch (error) {
-      if (error.message.includes("already exists")) {
-        console.warn(`⚠️ Le dossier "non classés" existe déjà sous Inbox.`);
-        // Refresh account folders and find the "non classés" folder again
-        account = await browser.accounts.get(accountId);
-        inboxFolder = account.folders.find(folder => folder.name === "Inbox");
-        nonClassesFolder = inboxFolder.subFolders.find(folder => folder.name === "non classés");
-        if (!nonClassesFolder) {
-          console.error("❌ Échec de la récupération du dossier existant 'non classés'.");
-          return null;
-        }
-      } else {
-        throw error;
-      }
-    }
-  }
-
-  return nonClassesFolder;
-}
-
 async function storeNotification(notification) {
     let notifications = await browser.storage.local.get('notifications');
     notifications = notifications.notifications || [];
@@ -354,3 +270,33 @@ async function storeNotification(notification) {
     await browser.storage.local.set({notifications});
 }
 
+
+// Récupère les ID des mails classés
+async function loadCopiedMailIds(folderPath) {
+    const result = await browser.storage.local.get(folderPath);
+    return result[folderPath] || [];
+}
+
+
+// Sauvegarde les ID des mails classés
+async function saveCopiedMailId(folderPath, messageId) {
+    const current = await loadCopiedMailIds(folderPath);
+    if (!current.includes(messageId)) {
+        current.push(messageId);
+        await browser.storage.local.set({ [folderPath]: current });
+    }
+}
+
+
+// Supprime le stockage local des ID de mails classés à utiliser en supprimant le dossier MindMail
+async function clearStoredFoldersData() {
+    const allData = await browser.storage.local.get(null); // Récupère tout
+    const keysToDelete = Object.keys(allData).filter(key => key.startsWith("MindMail/"));
+
+    for (let key of keysToDelete) {
+        await browser.storage.local.remove(key);
+        console.log(`Données supprimées pour le dossier : ${key}`);
+    }
+
+    console.log("Nettoyage des dossiers terminé.");
+}

@@ -80,27 +80,3 @@ export async function getTags(name_leaf) {
 
     return mergedTags;
 }
-
-export async function getTagHierarchy(targetNode) {
-    const mindMapData = await getSavedMindMap();
-
-    function findPath(node, target, path = []) {
-        const newPath = [...path, node];
-        if (node.topic === target) return newPath;
-        if (node.children) {
-            for (let child of node.children) {
-                const found = findPath(child, target, newPath);
-                if (found) return found;
-            }
-        }
-        return null;
-    }
-
-    const path = findPath(mindMapData.nodeData, targetNode);
-    if (!path) return [];
-
-    return path.map(n => ({
-        node: n.topic,
-        tags: n.tags || []
-    }));
-}
