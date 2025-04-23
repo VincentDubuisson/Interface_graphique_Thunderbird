@@ -1,6 +1,10 @@
 // Fetch notifications from storage and display
 browser.storage.local.get('notifications').then(data => {
-    const notifications = data.notifications || [];
+    let notifications = data.notifications || [];
+
+    // Trier par date décroissante (du plus récent au plus ancien)
+    notifications.sort((a, b) => new Date(b.date) - new Date(a.date));
+
     const container = document.getElementById('notifications');
     notifications.forEach(notification => {
         const div = document.createElement('div');
@@ -25,7 +29,6 @@ browser.storage.local.get('notifications').then(data => {
         const dismissButton = document.createElement('button');
         dismissButton.textContent = 'Dismiss';
         dismissButton.onclick = () => {
-            // Logic to dismiss the notification
             div.remove();
         };
 

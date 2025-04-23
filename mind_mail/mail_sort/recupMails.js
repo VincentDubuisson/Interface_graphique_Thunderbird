@@ -8,12 +8,13 @@ let allCopiedIds = new Set();
 
 // Fonction principale qui initialise le système et lance la récupération des mails
 export async function executeRecupEmails() {
-
-    //clearStoredFoldersData();
     
     await initAccount(); // Récupération des comptes mail disponibles
+    await loadAllPreviouslyCopiedIds();
     await initMainFolder(); // Création du dossier principal "MindMail"
     await createSubFolder(); // Création de la structure de dossiers en fonction de la carte mentale
+
+    //await clearStoredFoldersData(); // A utiliser avec précaution : réinitialise les IDs de mail classé
 
     // Chargement de la carte mentale sauvegardée
     const mindMapData = await getSavedMindMap();
@@ -29,6 +30,8 @@ export async function executeRecupEmails() {
     // Copie les mails non classés
     await handleUnsortedMails(allMails);
 
+    //await moveMailFromUnsorted(1548, "MindMail/Steam/Vente"); // Exemple d'utilisation du déplacement de mail non classé
+    
 }
 
 
@@ -100,15 +103,33 @@ async function browseNode(node, baseMails, path = "", isRoot = false) {
             const subject = mail.subject?.toLowerCase() || "";
             const author = mail.author?.toLowerCase() || "";
 
+            let bodyText = "";
+            try {
+                const fullMessage = await browser.messages.getFull(mail.id);
+                const parts = fullMessage.parts || [];
+                
+                // Recherche la première partie de type text/plain
+                for (let part of parts) {
+                    if (part.contentType === "text/plain" && part.body) {
+                        bodyText = part.body.toLowerCase();
+                        break;
+                    }
+                }
+            } catch (err) {
+                console.warn(`Erreur lors de la récupération du contenu du mail ${mail.id} :`, err);
+            }
+
             // Vérifie si le mail correspond à au moins un tag
             const hasMatchingTag = ownTags.some(tag =>
-                tag === "all" || subject.includes(tag) || author.includes(tag)
+                tag === "all" ||
+                subject.includes(tag) ||
+                author.includes(tag) ||
+                bodyText.includes(tag)
             );
 
             if (hasMatchingTag) {
                 // Ignore les mails déjà copiés
                 if (alreadyCopiedIds.includes(mail.id)) {
-                    console.log(`Mail déjà présent dans '${fullPath}' → Ignoré : ${mail.subject}`);
                     continue;
                 }
 
@@ -288,14 +309,16 @@ async function storeNotification(notification) {
 
 // Copie les mails non triés dans le dossier "Non Classé" s'ils ne sont liés à aucun tag
 async function handleUnsortedMails(allMails) {
+
+    const fullPath = "MindMail/Non Classé";
+    const folderId = folderNodeMap[fullPath]; // Récupère l’ID du dossier "Non Classé"
+
+
     const unclassifiedMails = allMails.filter(mail => !allCopiedIds.has(mail.id)); // Garde uniquement les mails encore non copiés
     if (unclassifiedMails.length === 0) {
         console.log("Tous les mails ont été triés.");
         return;
     }
-
-    const fullPath = "MindMail/Non Classé";
-    const folderId = folderNodeMap[fullPath]; // Récupère l’ID du dossier "Non Classé"
 
     if (!folderId) {
         console.warn("Dossier 'Non Classé' introuvable !");
@@ -308,6 +331,14 @@ async function handleUnsortedMails(allMails) {
             await saveCopiedMailId(fullPath, mail.id); // Enregistre son ID pour ne pas le copier à nouveau
             allCopiedIds.add(mail.id);
             console.log(`Mail non classé copié : ${mail.subject}`);
+
+            await storeNotification({
+                subject: mail.subject,
+                author: mail.author,
+                messageId: mail.id,
+                date: mail.date
+            });
+
         } catch (err) {
             console.error("Erreur copie mail non classé :", err);
         }
@@ -322,6 +353,19 @@ async function loadCopiedMailIds(folderPath) {
     const result = await browser.storage.local.get(folderPath);
     return result[folderPath] || [];
 }
+
+
+async function loadAllPreviouslyCopiedIds() {
+    const allData = await browser.storage.local.get(null);
+    for (const [key, value] of Object.entries(allData)) {
+        if (key.startsWith("MindMail/") && Array.isArray(value)) {
+            for (const id of value) {
+                allCopiedIds.add(id);
+            }
+        }
+    }
+}
+
 
 
 // Sauvegarde les ID des mails classés
@@ -345,4 +389,90 @@ async function clearStoredFoldersData() {
     }
 
     console.log("Nettoyage des dossiers terminé.");
+}
+
+
+// Déplace un mail depuis "Non Classé" vers un autre dossier de MindMail
+async function moveMailFromUnsorted(mailId, targetPath) {
+    const unsortedPath = "MindMail/Non Classé";
+    const sourceFolderId = folderNodeMap[unsortedPath];
+    const targetFolderId = folderNodeMap[targetPath];
+    console.log("Source folderId:", sourceFolderId);
+    console.log("Target folderId:", targetFolderId);
+
+    if (!sourceFolderId || !targetFolderId) {
+        console.error("Le dossier source ou cible est introuvable !");
+        console.log("sourceFolderId:", sourceFolderId);
+        console.log("targetFolderId:", targetFolderId);
+        return;
+    }
+
+    try {
+        // Liste les messages dans "Non Classé"
+        const sourceMessages = await getAllMessagesInFolder(sourceFolderId);
+
+        const mail = sourceMessages.find(msg => msg.id === mailId);
+
+        if (!mail) {
+            console.warn(`Le mail d'ID ${mailId} n'est pas dans 'Non Classé'.`);
+            return;
+        }
+
+        // Vérifier que 'mail' existe avant de tenter de le déplacer
+        if (mailId !== mail.id) {
+            console.warn(`L'ID du mail trouvé (${mail.id}) ne correspond pas à l'ID recherché (${mailId}).`);
+            return;
+        }
+
+        // Déplacement du mail
+        const result = await browser.messages.move([mailId], targetFolderId);
+        const movedMail = result?.messages?.[0];
+
+        if (!movedMail) {
+            console.warn("Le mail a été déplacé mais aucune info n’a été retournée par l’API.");
+        } else {
+            // Met à jour la mémoire locale avec le nouvel ID
+            await saveCopiedMailId(targetPath, movedMail.id);
+            allCopiedIds.delete(mailId);
+            allCopiedIds.add(movedMail.id);
+
+            console.log(`Mail déplacé vers '${targetPath}'`);
+
+            // Supprime l'ancien ID de la liste du dossier source
+            await removeCopiedMailId(unsortedPath, mailId);
+        }
+
+    } catch (err) {
+        console.error("Erreur déplacement mail :", err);
+    }
+}
+
+
+// Supprime un ID de mail depuis le fichier de suivi associé à un dossier donné
+async function removeCopiedMailId(path, idMail) {
+    try {
+        const storageKey = `copied-${path}`;
+        const result = await browser.storage.local.get(storageKey);
+        const existingIds = result[storageKey] || [];
+
+        const updatedIds = existingIds.filter(id => id !== idMail);
+
+        await browser.storage.local.set({ [storageKey]: updatedIds });
+        console.log(`ID supprimé du stockage local pour '${path}'`);
+    } catch (err) {
+        console.error(`Erreur suppression ID pour '${path}' :`, err);
+    }
+}
+
+async function getAllMessagesInFolder(folderId) {
+    let allMessages = [];
+    let result = await browser.messages.query({ folderId });
+    allMessages.push(...result.messages);
+
+    while (result.id) {
+        result = await browser.messages.continueList(result.id);
+        allMessages.push(...result.messages);
+    }
+
+    return allMessages;
 }
