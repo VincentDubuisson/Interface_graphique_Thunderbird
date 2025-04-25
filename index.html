@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Carte Mentale</title>
+    <script type="module" src="mind_map/mindMap.js"></script>
+    <style>
+        #map {
+            height: 75vh;
+            width: 75%;
+            border: 1px solid #ddd;
+        }
+        #notificationCenter {
+            margin-top: 20px;
+            border: 1px solid #ccc;
+            padding: 10px;
+        }
+        .notification { padding: 10px; border-bottom: 1px solid #ccc; cursor: pointer; }
+        .notification:hover { background-color: #f0f0f0; }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    
+    <button id="resetBtn">Réinitialiser la carte</button>
+
+    <div id="notificationCenter">
+        <h2>Notification Center</h2>
+        <button id="clearNotifications">Clear All Notifications</button>
+        <div id="notifications"></div>
+    </div>
+
+    <div id="messageButtonContainer"></div>
+    <ul id="mailList"></ul>
+    <div id="emailContent"></div>
+
+
+
+    <script type="module" src="mind_map/saveMindMap.js"></script>
+    <script src="notification/notification_center.js"></script>
+</body>
+</html>
