@@ -96,11 +96,11 @@ async function getMessagesFromFolder(folderName) {
     // Fonction récursive pour parcourir les dossiers et sous-dossiers
     async function searchInFolders(folders) {
         for (const folder of folders) {
-            console.log("Dossier trouvé:", folder.name); // Affiche chaque dossier
+            //console.log("Dossier trouvé:", folder.name); // Affiche chaque dossier
             if (folder.name === folderName) {
-                console.log(`Dossier trouvé: ${folderName}`);
+                //console.log(`Dossier trouvé: ${folderName}`);
                 let messages = await browser.messages.list(folder.id);
-                console.log(`Messages trouvés: ${messages.messages.length}`);
+                //console.log(`Messages trouvés: ${messages.messages.length}`);
                 return messages.messages; // Retourne les messages du dossier trouvé
             }
 
