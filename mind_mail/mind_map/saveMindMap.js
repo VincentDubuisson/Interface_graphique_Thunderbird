@@ -14,7 +14,7 @@ export function saveMindMap(mindMapData) {
         });
 }
 
-// Extrait les noeuds et tags de la carte mentale selon la hiérarchie
+// Extrait les noeuds de la carte mentale selon la hiérarchie
 export function extractNodeNames(mindMapData) {
     if (!mindMapData || !mindMapData.nodeData) {
         console.error("Données invalides reçues :", mindMapData);

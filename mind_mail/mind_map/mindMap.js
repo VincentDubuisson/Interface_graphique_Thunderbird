@@ -1,10 +1,12 @@
 import MindElixir from '../node_modules/mind-elixir/dist/MindElixir.js';
 import nodeMenu from '../node_modules/@mind-elixir/node-menu-neo/dist/node-menu-neo.js';
 import { saveMindMap } from './saveMindMap.js';
+import { clearStoredFoldersData } from "../mail_sort/recupMails.js";
 
+let mind;
 
 document.addEventListener("DOMContentLoaded", function () {
-    let mind = new MindElixir({
+    mind = new MindElixir({
         el: "#map",
         direction: MindElixir.SIDE,
         draggable: true,
@@ -60,16 +62,15 @@ document.addEventListener("DOMContentLoaded", function () {
         await showMails(folderName);
         createViewMessagesButton(folderName);
     });
-
-    // Réinitialise la carte mentale
-    const resetButton = document.getElementById("resetBtn");
-    resetButton.addEventListener("click", function() {
-        const newData = MindElixir.new("Nouvelle idée"); // Crée une nouvelle carte
-        mind.init(newData); // Réinitialise la carte mentale avec les données par défaut
-        saveMindMap(window.mind.getData()); // Sauvegarde la carte mentale
-        console.log('Carte mentale réinitialisée.');
-    });
 });
+
+export async function resetMindMap() {
+    const newData = MindElixir.new("Nouvelle idée"); // Crée une nouvelle carte
+    mind.init(newData); // Réinitialise la carte mentale avec les données par défaut
+    clearStoredFoldersData();
+    saveMindMap(window.mind.getData()); // Sauvegarde la carte mentale
+    console.log('Carte mentale réinitialisée.');
+}
 
 // Fonction pour créer un bouton pour afficher les messages
 function createViewMessagesButton(folderName) {

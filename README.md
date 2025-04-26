@@ -20,4 +20,5 @@ Maîtrise d'oeuvre:
 ## Notice d'utilisation
 
 La notice d'utilisation de l'extension est accessible via le lien suivant:
+
 [Consulter la notice d'utilisation](https://docs.google.com/document/d/1jr-BOHhd-yW8ez_JFGWlTmW-lulayzJJkrLUzTZTsyU/edit?usp=sharing)

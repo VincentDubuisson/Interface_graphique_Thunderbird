@@ -25,13 +25,13 @@
   },
   "permissions": [
       "messagesRead",
+      "messagesMove",
+      "messagesDelete",
       "accountsRead",
       "accountsFolders",
       "tabs",
-      "storage",
-      "messagesRead",
       "activeTab",
-      "messagesMove",
+      "storage",
       "notifications"
   ]
 }

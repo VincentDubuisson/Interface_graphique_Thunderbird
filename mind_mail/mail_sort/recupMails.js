@@ -14,14 +14,12 @@ export async function executeRecupEmails() {
     await initMainFolder(); // Création du dossier principal "MindMail"
     await createSubFolder(); // Création de la structure de dossiers en fonction de la carte mentale
 
-    //await clearStoredFoldersData(); // A utiliser avec précaution : réinitialise les IDs de mail classé
-
     // Chargement de la carte mentale sauvegardée
     const mindMapData = await getSavedMindMap();
     if (!mindMapData || !mindMapData.nodeData) return;
 
     // Récupère tous les mails une seule fois pour éviter les appels redondants
-    const allMails = await getAllMails();
+    let allMails = await getAllMails();
     console.log(`Nombre total de mails récupérés : ${allMails.length}`);
 
     // Lance le parcours de la carte mentale pour trier les mails
@@ -307,6 +305,14 @@ async function storeNotification(notification) {
 }
 
 
+// Méthode pour supprimer tous les éléments des notifications dans le stockage local
+async function clearNotifications() {
+    await browser.storage.local.remove('notifications');
+    document.getElementById('notifications').innerHTML = '';
+    console.log("All notifications removed from local storage.");
+}
+
+
 // Copie les mails non triés dans le dossier "Non Classé" s'ils ne sont liés à aucun tag
 async function handleUnsortedMails(allMails) {
 
@@ -367,7 +373,6 @@ async function loadAllPreviouslyCopiedIds() {
 }
 
 
-
 // Sauvegarde les ID des mails classés
 async function saveCopiedMailId(folderPath, messageId) {
     const current = await loadCopiedMailIds(folderPath);
@@ -378,22 +383,43 @@ async function saveCopiedMailId(folderPath, messageId) {
 }
 
 
-// Supprime le stockage local des ID de mails classés à utiliser en supprimant le dossier MindMail
-async function clearStoredFoldersData() {
-    const allData = await browser.storage.local.get(null); // Récupère tout
-    const keysToDelete = Object.keys(allData).filter(key => key.startsWith("MindMail/"));
+// Supprime le stockage local des ID de mails classés à utiliser et les dossiers de MindMail
+export async function clearStoredFoldersData() {
+    try {
+        console.log("Suppression du dossier 'MindMail'...");
 
-    for (let key of keysToDelete) {
-        await browser.storage.local.remove(key);
-        console.log(`Données supprimées pour le dossier : ${key}`);
+        const accounts = await browser.accounts.list();
+        const account = accounts[accounts.length - 1];
+        const mindMailFolder = account.folders.find(f => f.name === "MindMail");
+
+        if (!mindMailFolder) {
+            console.log("Le dossier 'MindMail' n'existe pas.");
+            return;
+        }
+
+        // Suppression du dossier 'MindMail'
+        await browser.folders.delete(mindMailFolder.id);
+        console.log("Dossier 'MindMail' supprimé.");
+
+        // Nettoyage du stockage local
+        const allData = await browser.storage.local.get(null); // Récupère tout
+        const keysToDelete = Object.keys(allData).filter(key => key.startsWith("MindMail/"));
+        for (let key of keysToDelete) {
+            await browser.storage.local.remove(key);
+            console.log(`Données supprimées pour le dossier : ${key}`);
+        }
+
+        await clearNotifications();
+        console.log("Stockage local supprimé.");
+
+    } catch (error) {
+        console.error("Erreur lors de la suppression :", error);
     }
-
-    console.log("Nettoyage des dossiers terminé.");
 }
 
 
 // Déplace un mail depuis "Non Classé" vers un autre dossier de MindMail
-async function moveMailFromUnsorted(mailId, targetPath) {
+export async function moveMailFromUnsorted(mailId, targetPath) {
     const unsortedPath = "MindMail/Non Classé";
     const sourceFolderId = folderNodeMap[unsortedPath];
     const targetFolderId = folderNodeMap[targetPath];
