@@ -1,5 +1,7 @@
 import { extractNodeNames } from '../mind_map/saveMindMap.js';
 import { getSavedMindMap } from "../mind_map/loadMindMap.js";
+import { getAllTags } from "./extractTerminalNodesName.js";
+import { loadAndDisplayNotifications } from "../notification/notification_center.js";
 
 let accounts;
 let folderNodeMap = {};
@@ -20,12 +22,20 @@ export async function executeRecupEmails() {
 
     const isSameStructure = compareFolderTrees(mindMapTree, currentFolderTree);
 
-    if (!isSameStructure) {
-        console.warn("Différence détectée entre la carte mentale et les dossiers MindMail. Nettoyage en cours...");
+    // Récupère les tags actuels
+    const currentTags = await getAllTags();
+
+    // Compare les tags stockés avec les nouveaux tags
+    const savedTags = await getSavedTags();
+    const isSameTags = compareTags(savedTags || [], currentTags);
+
+    if (!isSameStructure || !isSameTags) {
+        console.warn("Différence détectée entre la carte mentale, les dossiers et/ou les tags. Nettoyage en cours...");
         await clearStoredFoldersData();
         allCopiedIds = new Set();
         await initAccount();
         await initMainFolder(); // Création du dossier principal "MindMail"
+        await saveTags(currentTags); // Sauvegarde des nouveaux tags
     } else {
         console.log("Structure MindMail correcte, pas de nettoyage nécessaire.");
         await loadAllPreviouslyCopiedIds();
@@ -46,6 +56,8 @@ export async function executeRecupEmails() {
 
     // Copie les mails non classés
     await handleUnsortedMails(allMails);
+
+    loadAndDisplayNotifications();
 
     //await moveMailFromUnsorted(1548, "MindMail/Steam/Vente"); // Exemple d'utilisation du déplacement de mail non classé
     
@@ -552,3 +564,42 @@ function compareFolderTrees(tree1, tree2) {
 }
 
 
+// Fonction pour récupérer les tags précédemment stockés
+async function getSavedTags() {
+    const result = await browser.storage.local.get("tagsHierarchy");
+    return result.tagsHierarchy ? JSON.parse(result.tagsHierarchy) : null;
+}
+
+
+// Fonction pour sauvegarder la nouvelle hiérarchie des tags
+async function saveTags(tagsHierarchy) {
+    await browser.storage.local.set({ tagsHierarchy: JSON.stringify(tagsHierarchy) });
+}
+
+
+// Fonction de comparaison des hiérarchies de tags
+function compareTags(oldTags, newTags) {
+    // Si les tailles sont différentes, les tags ont changé
+    if (oldTags.length !== newTags.length) return false;
+
+    // Comparer chaque tag
+    for (let i = 0; i < oldTags.length; i++) {
+        const oldTag = oldTags[i];
+        const newTag = newTags[i];
+        if (oldTag.node !== newTag.node || !arraysEqual(oldTag.tags, newTag.tags)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+
+// Fonction utilitaire pour comparer des tableaux (tags)
+function arraysEqual(arr1, arr2) {
+    if (arr1.length !== arr2.length) return false;
+    for (let i = 0; i < arr1.length; i++) {
+        if (arr1[i] !== arr2[i]) return false;
+    }
+    return true;
+}
