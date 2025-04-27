@@ -10,8 +10,27 @@ let allCopiedIds = new Set();
 export async function executeRecupEmails() {
     
     await initAccount(); // Récupération des comptes mail disponibles
-    await loadAllPreviouslyCopiedIds();
-    await initMainFolder(); // Création du dossier principal "MindMail"
+    const mindMailFolder = await initMainFolder();
+
+    // Vérification de la correspondance de structure
+    const mindMapTree = extractNodeNames(await getSavedMindMap());
+    mindMapTree["Non Classé"] = {};
+
+    const currentFolderTree = await getCurrentMindMailTree(mindMailFolder);
+
+    const isSameStructure = compareFolderTrees(mindMapTree, currentFolderTree);
+
+    if (!isSameStructure) {
+        console.warn("Différence détectée entre la carte mentale et les dossiers MindMail. Nettoyage en cours...");
+        await clearStoredFoldersData();
+        allCopiedIds = new Set();
+        await initAccount();
+        await initMainFolder(); // Création du dossier principal "MindMail"
+    } else {
+        console.log("Structure MindMail correcte, pas de nettoyage nécessaire.");
+        await loadAllPreviouslyCopiedIds();
+    }
+
     await createSubFolder(); // Création de la structure de dossiers en fonction de la carte mentale
 
     // Chargement de la carte mentale sauvegardée
@@ -19,7 +38,7 @@ export async function executeRecupEmails() {
     if (!mindMapData || !mindMapData.nodeData) return;
 
     // Récupère tous les mails une seule fois pour éviter les appels redondants
-    let allMails = await getAllMails();
+    const allMails = await getAllMails();
     console.log(`Nombre total de mails récupérés : ${allMails.length}`);
 
     // Lance le parcours de la carte mentale pour trier les mails
@@ -490,6 +509,7 @@ async function removeCopiedMailId(path, idMail) {
     }
 }
 
+
 async function getAllMessagesInFolder(folderId) {
     let allMessages = [];
     let result = await browser.messages.query({ folderId });
@@ -502,3 +522,33 @@ async function getAllMessagesInFolder(folderId) {
 
     return allMessages;
 }
+
+
+async function getCurrentMindMailTree(mindMailFolder) {
+    const buildTree = async (folder) => {
+        const children = await browser.folders.getSubFolders(folder.id);
+        const tree = {};
+        for (const child of children) {
+            tree[child.name] = await buildTree(child); // récursif
+        }
+        return tree;
+    };
+
+    return await buildTree(mindMailFolder);
+}
+
+// Comparer les arbres entre deux nœuds
+function compareFolderTrees(tree1, tree2) {
+    const keys1 = Object.keys(tree1);
+    const keys2 = Object.keys(tree2);
+
+    if (keys1.length !== keys2.length) return false;
+
+    for (const key of keys1) {
+        if (!keys2.includes(key)) return false;
+        if (!compareFolderTrees(tree1[key], tree2[key])) return false;
+    }
+    return true;
+}
+
+
