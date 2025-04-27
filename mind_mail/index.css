@@ -43,6 +43,10 @@ body {
     height: 100%;
 }
 
+#settingsBtn:hover {
+    background-color: #e0e0e0;
+}
+
 #settingsMenu {
     position: absolute;
     top: 40px;
@@ -165,4 +169,27 @@ body {
 #confirmNo:hover {
     box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
     transform: translateY(-1px);
+}
+
+#reloadContainer {
+    position: absolute;
+    left: 15px;
+}
+
+#reloadBtn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+}
+
+#reloadBtn:hover {
+    background-color: #e0e0e0;
+}
+
+#reloadBtn span {
+    margin-left: 6px;
 }

@@ -1,4 +1,5 @@
 import { resetMindMap } from './mind_map/mindMap.js';
+import { executeRecupEmails } from './mail_sort/recupMails.js';
 
 const settingsBtn = document.getElementById('settingsBtn');
 const settingsMenu = document.getElementById('settingsMenu');
@@ -7,6 +8,7 @@ const resetMindMapButton = document.getElementById('resetMindMap');
 const customConfirm = document.getElementById('customConfirm');
 const confirmYesButton = document.getElementById('confirmYes');
 const confirmNoButton = document.getElementById('confirmNo');
+const reloadButton = document.getElementById('reloadBtn');
 
 // Ouvre / ferme le menu
 settingsBtn.addEventListener('click', (event) => {
@@ -16,6 +18,11 @@ settingsBtn.addEventListener('click', (event) => {
     } else {
         settingsMenu.style.display = 'none'; // Cache le menu
     }
+});
+
+reloadButton.addEventListener('click', (event) => {
+    event.stopPropagation();
+    executeRecupEmails();
 });
 
 // Ferme le menu si on clique ailleurs
