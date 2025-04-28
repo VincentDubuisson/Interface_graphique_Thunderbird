@@ -603,3 +603,53 @@ function arraysEqual(arr1, arr2) {
     }
     return true;
 }
+
+// Fonction interface menu ////////////////////////////////////////////////////////////////
+
+export async function getMailsFromFolder(folderName) {
+    const results = [];
+  
+    const accounts = await browser.accounts.list();
+  
+    for (const account of accounts) {
+      const rootFolders = account.folders || [];
+  
+      for (const folder of rootFolders) {
+        if (folder.name === "MindMail") {
+          const match = await findFolderByName(folder.subFolders, folderName);
+          if (match) {
+            const page = await messenger.messages.list(match);
+            const messages = page.messages || [];
+  
+            for (let msg of messages) {
+              results.push({
+                subject: msg.subject,
+                author: msg.author,
+                id: msg.id,
+                folderId:{
+                    accountId: match.accountId,
+                    path: match.path,
+                }
+              });
+            }
+          }
+        }
+      }
+    }
+  
+    return results;
+  }
+  
+  async function findFolderByName(folders, name) {
+    for (let folder of folders) {
+      if (folder.name.toLowerCase() === name.toLowerCase()) {
+        return folder;
+      }
+  
+      if (folder.subFolders && folder.subFolders.length > 0) {
+        const found = await findFolderByName(folder.subFolders, name);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
