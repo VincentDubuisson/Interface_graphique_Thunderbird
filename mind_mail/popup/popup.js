@@ -12,13 +12,19 @@ export function showMailPopup(mails, keyword) {
 
   const header = document.createElement("div");
   header.id = "popupHeader";
-  header.innerHTML = `<strong>Mails contenant : "${keyword}"</strong>`;
 
-  const closeBtn = document.createElement("span");
+  if (keyword == "") {
+    header.innerHTML = `<strong>Tout les mails</strong>`;
+  } else {
+    header.innerHTML = `<strong>Mails de ${keyword}</strong>`;
+  }
+  
+
+  /*const closeBtn = document.createElement("span");
   closeBtn.id = "popupClose";
   closeBtn.innerText = "X";
   closeBtn.onclick = () => popup.remove();
-  header.appendChild(closeBtn);
+  header.appendChild(closeBtn);*/
 
   popup.appendChild(header);
 
@@ -42,6 +48,17 @@ export function showMailPopup(mails, keyword) {
       author.className = "mailAuthor";
       author.innerText = mail.author || "";
 
+      const date = document.createElement("div");
+      date.className = "mailDate";
+      if (mail.date) {
+          const d = new Date(mail.date);
+          const formattedDate = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+          date.innerText = formattedDate;
+      } else {
+          date.innerText = "";
+      }
+
+
       const openBtn = document.createElement("button");
       openBtn.textContent = 'Ouvrir';
       openBtn.onclick = async () => {
@@ -62,6 +79,7 @@ export function showMailPopup(mails, keyword) {
     };
       mailCard.appendChild(subject);
       mailCard.appendChild(author);
+      mailCard.appendChild(date);
       mailCard.appendChild(openBtn);
 
       mailList.appendChild(mailCard);

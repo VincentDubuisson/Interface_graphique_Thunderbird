@@ -90,7 +90,8 @@ body {
 #map {
     margin-top: 40px;
     height: 75vh;
-    width: 60%;
+    width: 70%;
+    left: 29.92%;
     border: 1px solid #ddd;
 }
 

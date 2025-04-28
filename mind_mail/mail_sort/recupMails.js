@@ -2,6 +2,7 @@ import { extractNodeNames } from '../mind_map/saveMindMap.js';
 import { getSavedMindMap } from "../mind_map/loadMindMap.js";
 import { getAllTags } from "./extractTerminalNodesName.js";
 import { loadAndDisplayNotifications } from "../notification/notification_center.js";
+import { showMailPopup } from "../popup/popup.js";
 
 let accounts;
 let folderNodeMap = {};
@@ -10,6 +11,9 @@ let allCopiedIds = new Set();
 
 // Fonction principale qui initialise le système et lance la récupération des mails
 export async function executeRecupEmails() {
+
+    const mails = await getMailsFromFolder("");
+    showMailPopup(mails, "");
     
     await initAccount(); // Récupération des comptes mail disponibles
     const mindMailFolder = await initMainFolder();
@@ -612,44 +616,47 @@ export async function getMailsFromFolder(folderName) {
     const accounts = await browser.accounts.list();
   
     for (const account of accounts) {
-      const rootFolders = account.folders || [];
-  
-      for (const folder of rootFolders) {
-        if (folder.name === "MindMail") {
-          const match = await findFolderByName(folder.subFolders, folderName);
-          if (match) {
-            const page = await messenger.messages.list(match);
-            const messages = page.messages || [];
-  
-            for (let msg of messages) {
-              results.push({
-                subject: msg.subject,
-                author: msg.author,
-                id: msg.id,
-                folderId:{
-                    accountId: match.accountId,
-                    path: match.path,
+        const rootFolders = account.folders || [];
+    
+        for (const folder of rootFolders) {
+            if (folder.name === "MindMail") {
+                const match = await findFolderIdByName(folder.subFolders, folderName);
+                if (match) {
+                    const page = await messenger.messages.list(match);
+                    const messages = page.messages || [];
+    
+                    for (let msg of messages) {
+                        results.push({
+                            subject: msg.subject,
+                            author: msg.author,
+                            id: msg.id,
+                            date: msg.date,
+                            folderId:{
+                                accountId: match.accountId,
+                                path: match.path,
+                            }
+                        });
+                    }
                 }
-              });
             }
-          }
         }
-      }
     }
+
+    results.sort((a, b) => new Date(b.date) - new Date(a.date));
   
     return results;
-  }
+}
   
-  async function findFolderByName(folders, name) {
+async function findFolderIdByName(folders, name) {
     for (let folder of folders) {
-      if (folder.name.toLowerCase() === name.toLowerCase()) {
-        return folder;
-      }
-  
-      if (folder.subFolders && folder.subFolders.length > 0) {
-        const found = await findFolderByName(folder.subFolders, name);
-        if (found) return found;
-      }
+        if (folder.name.toLowerCase() === name.toLowerCase()) {
+            return { accountId: folder.accountId, path: folder.path };
+        }
+    
+        if (folder.subFolders && folder.subFolders.length > 0) {
+            const found = await findFolderIdByName(folder.subFolders, name);
+            if (found) return found;
+        }
     }
     return null;
-  }
+}
