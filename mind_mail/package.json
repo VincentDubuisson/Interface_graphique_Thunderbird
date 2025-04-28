@@ -12,6 +12,7 @@
   "dependencies": {
     "@mind-elixir/node-menu": "^1.0.4",
     "@mind-elixir/node-menu-neo": "^1.0.4",
+    "hello_world": "file:",
     "mind-elixir": "^4.3.7",
     "mind-elixir-react": "^1.0.1"
   }

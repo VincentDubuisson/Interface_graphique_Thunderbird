@@ -80,30 +80,3 @@ export async function getTags(name_leaf) {
 
     return mergedTags;
 }
-
-
-export async function getAllTags() {
-    const mindMapData = await getSavedMindMap();
-    const allTags = [];
-
-    // Fonction récursive pour parcourir tous les nœuds
-    function traverseNode(node) {
-        // Si le nœud a des enfants, on les traverse aussi
-        if (node.children) {
-            node.children.forEach(child => traverseNode(child));
-        }
-        
-        // On ajoute les tags du nœud à la liste si disponible
-        if (node.tags) {
-            allTags.push({
-                node: node.topic,
-                tags: node.tags
-            });
-        }
-    }
-
-    // Démarrer la traversée depuis la racine (nodeData)
-    traverseNode(mindMapData.nodeData);
-
-    return allTags;
-}

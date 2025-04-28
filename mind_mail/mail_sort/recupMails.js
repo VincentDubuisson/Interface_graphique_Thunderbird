@@ -1,8 +1,5 @@
 import { extractNodeNames } from '../mind_map/saveMindMap.js';
 import { getSavedMindMap } from "../mind_map/loadMindMap.js";
-import { getAllTags } from "./extractTerminalNodesName.js";
-import { loadAndDisplayNotifications } from "../notification/notification_center.js";
-import { showMailPopup } from "../popup/popup.js";
 
 let accounts;
 let folderNodeMap = {};
@@ -11,41 +8,13 @@ let allCopiedIds = new Set();
 
 // Fonction principale qui initialise le système et lance la récupération des mails
 export async function executeRecupEmails() {
-
-    const mails = await getMailsFromFolder("");
-    showMailPopup(mails, "");
     
     await initAccount(); // Récupération des comptes mail disponibles
-    const mindMailFolder = await initMainFolder();
-
-    // Vérification de la correspondance de structure
-    const mindMapTree = extractNodeNames(await getSavedMindMap());
-    mindMapTree["Non Classé"] = {};
-
-    const currentFolderTree = await getCurrentMindMailTree(mindMailFolder);
-
-    const isSameStructure = compareFolderTrees(mindMapTree, currentFolderTree);
-
-    // Récupère les tags actuels
-    const currentTags = await getAllTags();
-
-    // Compare les tags stockés avec les nouveaux tags
-    const savedTags = await getSavedTags();
-    const isSameTags = compareTags(savedTags || [], currentTags);
-
-    if (!isSameStructure || !isSameTags) {
-        console.warn("Différence détectée entre la carte mentale, les dossiers et/ou les tags. Nettoyage en cours...");
-        await clearStoredFoldersData();
-        allCopiedIds = new Set();
-        await initAccount();
-        await initMainFolder(); // Création du dossier principal "MindMail"
-        await saveTags(currentTags); // Sauvegarde des nouveaux tags
-    } else {
-        console.log("Structure MindMail correcte, pas de nettoyage nécessaire.");
-        await loadAllPreviouslyCopiedIds();
-    }
-
+    await loadAllPreviouslyCopiedIds();
+    await initMainFolder(); // Création du dossier principal "MindMail"
     await createSubFolder(); // Création de la structure de dossiers en fonction de la carte mentale
+
+    //await clearStoredFoldersData(); // A utiliser avec précaution : réinitialise les IDs de mail classé
 
     // Chargement de la carte mentale sauvegardée
     const mindMapData = await getSavedMindMap();
@@ -60,8 +29,6 @@ export async function executeRecupEmails() {
 
     // Copie les mails non classés
     await handleUnsortedMails(allMails);
-
-    loadAndDisplayNotifications();
 
     //await moveMailFromUnsorted(1548, "MindMail/Steam/Vente"); // Exemple d'utilisation du déplacement de mail non classé
     
@@ -296,7 +263,7 @@ async function createMindMapFolders(tree, parentFolderId, parentPath = "") {
                 console.log("Dossier créé :", newFolder.path);
             }
 
-            const fullPath = `MindMail/${parentPath}${nodeName}`;
+            const fullPath = parentPath ? `MindMail/${parentPath}${nodeName}` : `MindMail/${nodeName}`;
             folderMap[fullPath] = folderId; // Associe le chemin complet à l'ID
             if (newFolder) folderMap[newFolder.path] = folderId; // Et aussi le chemin absolu Thunderbird
 
@@ -337,14 +304,6 @@ async function storeNotification(notification) {
     notifications = notifications.notifications || [];
     notifications.push(notification);
     await browser.storage.local.set({notifications});
-}
-
-
-// Méthode pour supprimer tous les éléments des notifications dans le stockage local
-async function clearNotifications() {
-    await browser.storage.local.remove('notifications');
-    document.getElementById('notifications').innerHTML = '';
-    console.log("All notifications removed from local storage.");
 }
 
 
@@ -408,6 +367,7 @@ async function loadAllPreviouslyCopiedIds() {
 }
 
 
+
 // Sauvegarde les ID des mails classés
 async function saveCopiedMailId(folderPath, messageId) {
     const current = await loadCopiedMailIds(folderPath);
@@ -418,43 +378,36 @@ async function saveCopiedMailId(folderPath, messageId) {
 }
 
 
-// Supprime le stockage local des ID de mails classés à utiliser et les dossiers de MindMail
-export async function clearStoredFoldersData() {
-    try {
-        console.log("Suppression du dossier 'MindMail'...");
+// Supprime le stockage local des ID de mails classés à utiliser en supprimant le dossier MindMail
+async function clearStoredFoldersData() {
+    const allData = await browser.storage.local.get(null); // Récupère tout
+    const keysToDelete = Object.keys(allData).filter(key => key.startsWith("MindMail/"));
 
-        const accounts = await browser.accounts.list();
-        const account = accounts[accounts.length - 1];
-        const mindMailFolder = account.folders.find(f => f.name === "MindMail");
-
-        if (!mindMailFolder) {
-            console.log("Le dossier 'MindMail' n'existe pas.");
-            return;
-        }
-
-        // Suppression du dossier 'MindMail'
-        await browser.folders.delete(mindMailFolder.id);
-        console.log("Dossier 'MindMail' supprimé.");
-
-        // Nettoyage du stockage local
-        const allData = await browser.storage.local.get(null); // Récupère tout
-        const keysToDelete = Object.keys(allData).filter(key => key.startsWith("MindMail/"));
-        for (let key of keysToDelete) {
-            await browser.storage.local.remove(key);
-            console.log(`Données supprimées pour le dossier : ${key}`);
-        }
-
-        await clearNotifications();
-        console.log("Stockage local supprimé.");
-
-    } catch (error) {
-        console.error("Erreur lors de la suppression :", error);
+    for (let key of keysToDelete) {
+        await browser.storage.local.remove(key);
+        console.log(`Données supprimées pour le dossier : ${key}`);
     }
+
+    console.log("Nettoyage des dossiers terminé.");
 }
 
 
 // Déplace un mail depuis "Non Classé" vers un autre dossier de MindMail
 export async function moveMailFromUnsorted(mailId, targetPath) {
+    if (Object.keys(folderNodeMap).length === 0) {
+        if (!accounts || accounts.length === 0) {
+            accounts = await browser.accounts.list();
+        }
+        const mindMapData = await getSavedMindMap();
+        const mindMailFolder = await getMindMailFolder(accounts[accounts.length - 1]);
+        if (mindMailFolder && mindMapData && mindMapData.nodeData) {
+            const tree = extractNodeNames(mindMapData);
+        tree["Non Classé"] = {};
+        const newMap = await createMindMapFolders(tree, mindMailFolder.id);
+        Object.assign(folderNodeMap, newMap);
+        }
+    }
+
     const unsortedPath = "MindMail/Non Classé";
     const sourceFolderId = folderNodeMap[unsortedPath];
     const targetFolderId = folderNodeMap[targetPath];
@@ -512,7 +465,7 @@ export async function moveMailFromUnsorted(mailId, targetPath) {
 // Supprime un ID de mail depuis le fichier de suivi associé à un dossier donné
 async function removeCopiedMailId(path, idMail) {
     try {
-        const storageKey = `copied-${path}`;
+        const storageKey = path;
         const result = await browser.storage.local.get(storageKey);
         const existingIds = result[storageKey] || [];
 
@@ -524,7 +477,6 @@ async function removeCopiedMailId(path, idMail) {
         console.error(`Erreur suppression ID pour '${path}' :`, err);
     }
 }
-
 
 async function getAllMessagesInFolder(folderId) {
     let allMessages = [];
@@ -539,124 +491,4 @@ async function getAllMessagesInFolder(folderId) {
     return allMessages;
 }
 
-
-async function getCurrentMindMailTree(mindMailFolder) {
-    const buildTree = async (folder) => {
-        const children = await browser.folders.getSubFolders(folder.id);
-        const tree = {};
-        for (const child of children) {
-            tree[child.name] = await buildTree(child); // récursif
-        }
-        return tree;
-    };
-
-    return await buildTree(mindMailFolder);
-}
-
-// Comparer les arbres entre deux nœuds
-function compareFolderTrees(tree1, tree2) {
-    const keys1 = Object.keys(tree1);
-    const keys2 = Object.keys(tree2);
-
-    if (keys1.length !== keys2.length) return false;
-
-    for (const key of keys1) {
-        if (!keys2.includes(key)) return false;
-        if (!compareFolderTrees(tree1[key], tree2[key])) return false;
-    }
-    return true;
-}
-
-
-// Fonction pour récupérer les tags précédemment stockés
-async function getSavedTags() {
-    const result = await browser.storage.local.get("tagsHierarchy");
-    return result.tagsHierarchy ? JSON.parse(result.tagsHierarchy) : null;
-}
-
-
-// Fonction pour sauvegarder la nouvelle hiérarchie des tags
-async function saveTags(tagsHierarchy) {
-    await browser.storage.local.set({ tagsHierarchy: JSON.stringify(tagsHierarchy) });
-}
-
-
-// Fonction de comparaison des hiérarchies de tags
-function compareTags(oldTags, newTags) {
-    // Si les tailles sont différentes, les tags ont changé
-    if (oldTags.length !== newTags.length) return false;
-
-    // Comparer chaque tag
-    for (let i = 0; i < oldTags.length; i++) {
-        const oldTag = oldTags[i];
-        const newTag = newTags[i];
-        if (oldTag.node !== newTag.node || !arraysEqual(oldTag.tags, newTag.tags)) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
-
-// Fonction utilitaire pour comparer des tableaux (tags)
-function arraysEqual(arr1, arr2) {
-    if (arr1.length !== arr2.length) return false;
-    for (let i = 0; i < arr1.length; i++) {
-        if (arr1[i] !== arr2[i]) return false;
-    }
-    return true;
-}
-
-// Fonction interface menu ////////////////////////////////////////////////////////////////
-
-export async function getMailsFromFolder(folderName) {
-    const results = [];
-  
-    const accounts = await browser.accounts.list();
-  
-    for (const account of accounts) {
-        const rootFolders = account.folders || [];
-    
-        for (const folder of rootFolders) {
-            if (folder.name === "MindMail") {
-                const match = await findFolderIdByName(folder.subFolders, folderName);
-                if (match) {
-                    const page = await messenger.messages.list(match);
-                    const messages = page.messages || [];
-    
-                    for (let msg of messages) {
-                        results.push({
-                            subject: msg.subject,
-                            author: msg.author,
-                            id: msg.id,
-                            date: msg.date,
-                            folderId:{
-                                accountId: match.accountId,
-                                path: match.path,
-                            }
-                        });
-                    }
-                }
-            }
-        }
-    }
-
-    results.sort((a, b) => new Date(b.date) - new Date(a.date));
-  
-    return results;
-}
-  
-async function findFolderIdByName(folders, name) {
-    for (let folder of folders) {
-        if (folder.name.toLowerCase() === name.toLowerCase()) {
-            return { accountId: folder.accountId, path: folder.path };
-        }
-    
-        if (folder.subFolders && folder.subFolders.length > 0) {
-            const found = await findFolderIdByName(folder.subFolders, name);
-            if (found) return found;
-        }
-    }
-    return null;
-}
+export { folderNodeMap, createMindMapFolders, getMindMailFolder };
