@@ -39,16 +39,3 @@ export function loadAndDisplayNotifications() {
         });
     });
 }
-
-document.addEventListener('DOMContentLoaded', () => {
-    loadAndDisplayNotifications(); 
-
-    const clearButton = document.getElementById('clearNotifications');
-    if (clearButton) {
-        clearButton.onclick = async () => {
-            await browser.storage.local.clear();
-            document.getElementById('notifications').innerHTML = ''; // Clear the displayed notifications
-            console.log("All notifications cleared.");
-        };
-    }
-});

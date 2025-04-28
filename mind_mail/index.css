@@ -194,3 +194,32 @@ body {
 #reloadBtn span {
     margin-left: 6px;
 }
+
+#unsortedMailsSection {
+    margin-top: 20px;
+    border: 1px solid #ccc;
+    padding: 10px;
+}
+.mail-item {
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.folder-select {
+    min-width: 200px;
+    padding: 5px;
+}
+.move-btn {
+    padding: 5px 10px;
+    margin-left: 10px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+}
+.move-btn:hover {
+    background-color: #45a049;
+}

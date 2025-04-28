@@ -660,3 +660,5 @@ async function findFolderIdByName(folders, name) {
     }
     return null;
 }
+
+export { folderNodeMap, createMindMapFolders, getMindMailFolder, getAllMessagesInFolder};
