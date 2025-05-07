@@ -23,6 +23,7 @@
       "scripts": ["background.js"],
       "persistent": true
   },
+
   "permissions": [
       "messagesRead",
       "messagesMove",
@@ -33,5 +34,24 @@
       "activeTab",
       "storage",
       "notifications"
-  ]
+  ],
+
+  "experiment_apis": {
+    "Xpunge": {
+      "schema": "Xpunge_api/Xpunge/schema.json",
+      "parent": {
+        "scopes": ["addon_parent"],
+        "paths": [["Xpunge"]],
+        "script": "Xpunge_api/Xpunge/implementation.js"
+      }
+    },
+    "LegacyPrefsMigrator": {
+      "schema": "Xpunge_api/LegacyPrefsMigrator/schema.json",
+      "parent": {
+        "scopes": ["addon_parent"],
+        "paths": [["LegacyPrefsMigrator"]],
+        "script": "Xpunge_api/LegacyPrefsMigrator/implementation.js"
+      }
+    }
+  }
 }

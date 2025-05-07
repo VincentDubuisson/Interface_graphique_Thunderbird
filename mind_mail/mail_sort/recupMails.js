@@ -3,6 +3,7 @@ import { getSavedMindMap } from "../mind_map/loadMindMap.js";
 import { getAllTags } from "./extractTerminalNodesName.js";
 import { loadAndDisplayNotifications } from "../notification/notification_center.js";
 import { showMailPopup } from "../popup/popup.js";
+import { emptyTrashFolder } from "../trash/trash.js";
 
 let accounts;
 let folderNodeMap = {};
@@ -36,6 +37,7 @@ export async function executeRecupEmails() {
     if (!isSameStructure || !isSameTags) {
         console.warn("Différence détectée entre la carte mentale, les dossiers et/ou les tags. Nettoyage en cours...");
         await clearStoredFoldersData();
+        await emptyTrashFolder();
         allCopiedIds = new Set();
         await initAccount();
         await initMainFolder(); // Création du dossier principal "MindMail"
