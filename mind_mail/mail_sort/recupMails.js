@@ -63,7 +63,9 @@ export async function executeRecupEmails() {
     // Copie les mails non classés
     await handleUnsortedMails(allMails);
 
-    loadAndDisplayNotifications();
+    document.addEventListener('DOMContentLoaded', () => {
+        loadAndDisplayNotifications();
+    });
 
     //await moveMailFromUnsorted(1548, "MindMail/Steam/Vente"); // Exemple d'utilisation du déplacement de mail non classé
     
@@ -538,7 +540,15 @@ async function getAllMessagesInFolder(folderId) {
         allMessages.push(...result.messages);
     }
 
-    return allMessages;
+    // Format date without timezone
+    return allMessages.map(msg => {
+        const dateObj = new Date(msg.date);
+        const formattedDate = dateObj.toString().replace(/\s*\([^)]*\)/, '');
+        return {
+            ...msg,
+            date: formattedDate
+        };
+    });
 }
 
 

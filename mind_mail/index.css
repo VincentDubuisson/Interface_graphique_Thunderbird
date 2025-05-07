@@ -223,3 +223,24 @@ body {
 .move-btn:hover {
     background-color: #45a049;
 }
+
+#moveAllBtn {
+    margin-left: 15px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+#moveAllBtn:hover {
+    background-color: #45a049;
+}
+
+#moveAllContainer {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 10px;
+}

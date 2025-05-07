@@ -61,14 +61,34 @@ async function getUnsortedMails() {
 
     try {
         const result = await browser.messages.list(unsortedFolder.id);
-        const messages = result.messages || [];
+        const seenIds = new Set();
+        const uniqueMessages = [];
 
-        return messages.map(message => ({
-            id: message.id,
-            subject: message.subject,
-            author: message.author,
-            date: new Date(message.date).toLocaleString()
-        }));
+        // Charge les mails déjà copiés (tous dossiers MindMail)
+        const allData = await browser.storage.local.get(null);
+        const copiedIds = new Set();
+
+        for (const [key, value] of Object.entries(allData)) {
+            if (key.startsWith("MindMail/") && Array.isArray(value)) {
+                for (const id of value) {
+                    copiedIds.add(id);
+                }
+            }
+        }
+
+        for (const message of result.messages || []) {
+            if (!seenIds.has(message.id)) {
+                seenIds.add(message.id);
+                uniqueMessages.push({
+                    id: message.id,
+                    subject: message.subject,
+                    author: message.author,
+                    date: new Date(message.date).toLocaleString()
+                });
+            }
+        }        
+
+        return uniqueMessages;
     } catch (error) {
         console.error("Erreur lors de la récupération des mails non classés:", error);
         return [];
@@ -79,19 +99,24 @@ async function getUnsortedMails() {
 function createFolderSelect(folders) {
     const select = document.createElement('select');
     select.className = 'folder-select';
-    
+
     folders.forEach(folder => {
         const option = document.createElement('option');
         option.value = folder;
         option.textContent = folder;
+
+        if (folder === "MindMail/Non Classé") {
+            option.selected = true;
+        }
+
         select.appendChild(option);
     });
-    
+
     return select;
 }
 
 // Fonction pour créer un élément de mail non classé
-function createMailItem(mail, folders) {
+function createMailItem(mail, folders, isNew = false) {
     const mailDiv = document.createElement('div');
     mailDiv.className = 'mail-item';
     
@@ -110,8 +135,13 @@ function createMailItem(mail, folders) {
     moveButton.textContent = 'Déplacer';
     moveButton.onclick = async () => {
         try {
+            if (select.value === "MindMail/Non Classé") {
+                console.log("Le mail est déjà dans 'Non Classé', déplacement ignoré.");
+                return;
+            }
+            
             await moveMailFromUnsorted(mail.id, select.value);
-            mailDiv.remove(); // Supprime l'élément de l'interface après le déplacement
+            mailDiv.remove(); // Supprime l'élément            
             
             // Affiche une notification de succès
             const notification = {
@@ -143,6 +173,15 @@ function createMailItem(mail, folders) {
     
     controls.appendChild(select);
     controls.appendChild(moveButton);
+    
+    if (isNew) {
+        const newBadge = document.createElement('span');
+        newBadge.textContent = '🔴 Nouveau';
+        newBadge.style.color = 'red';
+        newBadge.style.fontWeight = 'bold';
+        newBadge.style.marginRight = '10px';
+        mailInfo.prepend(newBadge);
+    }
     
     mailDiv.appendChild(mailInfo);
     mailDiv.appendChild(controls);
@@ -190,11 +229,14 @@ async function getMailsFromFolder(folderName) {
 // Fonction pour initialiser l'interface des mails non classés
 async function initUnsortedMailsUI() {
     const unsortedMailsContainer = document.getElementById('unsortedMails');
+    unsortedMailsContainer.innerHTML = '';
     if (!unsortedMailsContainer) return;
-    
+
     try {
         // Récupère les dossiers disponibles
         let folders = Object.keys(folderNodeMap);
+        folders = folders.map(f => f.replace(/^\/+/, ''));
+        folders = [...new Set(folders)];
         if (folders.length === 0) {
             console.log("Folder map empty, reloading MindMap...");
 
@@ -208,22 +250,64 @@ async function initUnsortedMailsUI() {
                 folders = Object.keys(folderNodeMap);
             }
         }
-        
+
         // Récupère la liste des mails non classés
-        const unsortedMails = await getAllMessagesInFolder(await getUnsortedFolder().id);
+        const unsortedFolder = await getUnsortedFolder();
+        const allData = await browser.storage.local.get(null);
+        const copiedIds = new Set();
+
+        for (const [key, value] of Object.entries(allData)) {
+            if (key.startsWith("MindMail/") && Array.isArray(value)) {
+                for (const id of value) {
+                    copiedIds.add(id);
+                }
+            }
+        }
+
+        let unsortedMails = await getAllMessagesInFolder(unsortedFolder.id);
+        unsortedMails = unsortedMails.filter(mail => !copiedIds.has(mail.id));
+
+        // Met à jour le compteur dans le titre
+        const countSpan = document.getElementById('unsortedCount');
+        if (countSpan) {
+            countSpan.textContent = `(${unsortedMails.length})`;
+        }
+
         unsortedMails.sort((a, b) => new Date(b.date) - new Date(a.date));
-        
+
         if (unsortedMails.length === 0) {
             unsortedMailsContainer.innerHTML = '<p>Aucun mail non classé.</p>';
             return;
         }
-        
-        // Crée les éléments d'interface pour chaque mail non classé
+
+        // Charge les IDs déjà vus
+        const seenKey = 'seenUnsortedMailIds';
+        const seenData = await browser.storage.local.get(seenKey);
+        const seenIds = new Set(seenData[seenKey] || []);
+
+        // Crée les éléments d'interface
         unsortedMails.forEach(mail => {
-            const mailElement = createMailItem(mail, folders);
+            const isNew = !seenIds.has(mail.id);
+            const mailElement = createMailItem(mail, folders, isNew);
             unsortedMailsContainer.appendChild(mailElement);
         });
-        
+
+        // Met à jour le stockage avec les IDs actuels
+        const currentIds = unsortedMails.map(m => m.id);
+        await browser.storage.local.set({ [seenKey]: currentIds });
+
+        // Ajoute le gestionnaire de clic pour le bouton "Tout Déplacer"
+        const moveAllBtn = document.getElementById('moveAllBtn');
+        if (moveAllBtn) {
+            moveAllBtn.addEventListener('click', async () => {
+                const allMoveButtons = document.querySelectorAll('.move-btn');
+                for (let btn of allMoveButtons) {
+                    btn.click();
+                    await new Promise(res => setTimeout(res, 300)); // Petit délai pour éviter les collisions
+                }
+            });
+        }
+
     } catch (error) {
         console.error('Erreur lors de l\'initialisation de l\'interface des mails non classés:', error);
         unsortedMailsContainer.innerHTML = '<p>Erreur lors du chargement des mails non classés.</p>';
@@ -232,3 +316,5 @@ async function initUnsortedMailsUI() {
 
 // Initialise l'interface au chargement de la page
 document.addEventListener('DOMContentLoaded', initUnsortedMailsUI);
+
+export { initUnsortedMailsUI };

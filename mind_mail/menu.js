@@ -1,5 +1,6 @@
 import { resetMindMap } from './mind_map/mindMap.js';
 import { executeRecupEmails } from './mail_sort/recupMails.js';
+import { initUnsortedMailsUI } from "./mail_sort/unsortedMailsUI.js";
 
 const settingsBtn = document.getElementById('settingsBtn');
 const settingsMenu = document.getElementById('settingsMenu');
@@ -20,9 +21,15 @@ settingsBtn.addEventListener('click', (event) => {
     }
 });
 
-reloadButton.addEventListener('click', (event) => {
+reloadButton.addEventListener('click', async (event) => {
     event.stopPropagation();
-    executeRecupEmails();
+
+    try {
+        await executeRecupEmails();
+        await initUnsortedMailsUI();
+    } catch (error) {
+        console.error("Erreur pendant le rechargement:", error);
+    }
 });
 
 // Ferme le menu si on clique ailleurs
