@@ -1,8 +1,8 @@
-import MindElixir from '../node_modules/mind-elixir/dist/MindElixir.js';
-import nodeMenu from '../node_modules/@mind-elixir/node-menu-neo/dist/node-menu-neo.js';
+import MindElixir from '../api/node_modules/mind-elixir/dist/MindElixir.js';
+import nodeMenu from '../api/node_modules/@mind-elixir/node-menu-neo/dist/node-menu-neo.js';
 import { saveMindMap } from './saveMindMap.js';
-import { clearStoredFoldersData } from "../mail_sort/recupMails.js";
-import { showMailPopup } from '../popup/popup.js';
+import { clearStoredFoldersData } from "../mail_sort/mailSort.js";
+import { showMailPopup } from '../web_interface/popup/popup.js';
 
 
 let mind;
@@ -63,7 +63,7 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 
 export async function resetMindMap() {
-    const newData = MindElixir.new("Nouvelle idée"); // Crée une nouvelle carte
+    const newData = MindElixir.new("Nouvelle carte"); // Crée une nouvelle carte
     mind.init(newData); // Réinitialise la carte mentale avec les données par défaut
     clearStoredFoldersData();
     saveMindMap(window.mind.getData()); // Sauvegarde la carte mentale

@@ -12,12 +12,12 @@
   },
   "browser_action": {
       "default_title": "Mind Mail",
-      "default_icon": "images/internet-32px.png"
+      "default_icon": "ressources/internet-32px.png"
   },
   "icons": {
-      "64": "images/internet.png",
-      "32": "images/internet-32px.png",
-      "16": "images/internet-16px.png"
+      "64": "ressources/internet.png",
+      "32": "ressources/internet-32px.png",
+      "16": "ressources/internet-16px.png"
   },
   "background": {
       "scripts": ["background.js"],
@@ -38,19 +38,19 @@
 
   "experiment_apis": {
     "Xpunge": {
-      "schema": "Xpunge_api/Xpunge/schema.json",
+      "schema": "api/Xpunge_api/Xpunge/schema.json",
       "parent": {
         "scopes": ["addon_parent"],
         "paths": [["Xpunge"]],
-        "script": "Xpunge_api/Xpunge/implementation.js"
+        "script": "api/Xpunge_api/Xpunge/implementation.js"
       }
     },
     "LegacyPrefsMigrator": {
-      "schema": "Xpunge_api/LegacyPrefsMigrator/schema.json",
+      "schema": "api/Xpunge_api/XpungeLegacyPrefsMigrator/schema.json",
       "parent": {
         "scopes": ["addon_parent"],
-        "paths": [["LegacyPrefsMigrator"]],
-        "script": "Xpunge_api/LegacyPrefsMigrator/implementation.js"
+        "paths": [["XpungeLegacyPrefsMigrator"]],
+        "script": "api/Xpunge_api/XpungeLegacyPrefsMigrator/implementation.js"
       }
     }
   }

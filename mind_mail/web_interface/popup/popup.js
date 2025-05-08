@@ -1,6 +1,6 @@
 const style = document.createElement("link");
 style.rel = "stylesheet";
-style.href = "../popup/popup.css";
+style.href = "./popup/popup.css";
 document.head.appendChild(style);
 
 export function showMailPopup(mails, keyword) {

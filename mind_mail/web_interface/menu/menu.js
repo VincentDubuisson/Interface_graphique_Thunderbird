@@ -1,6 +1,6 @@
-import { resetMindMap } from './mind_map/mindMap.js';
-import { executeRecupEmails } from './mail_sort/recupMails.js';
-import { initUnsortedMailsUI } from "./mail_sort/unsortedMailsUI.js";
+import { resetMindMap } from '../../mind_map/mindMap.js';
+import { executeMailSort } from '../../mail_sort/mailSort.js';
+import { initUnsortedMailsUI } from "../../mail_sort/unsortedMailsUI.js";
 
 const settingsBtn = document.getElementById('settingsBtn');
 const settingsMenu = document.getElementById('settingsMenu');
@@ -25,7 +25,7 @@ reloadButton.addEventListener('click', async (event) => {
     event.stopPropagation();
 
     try {
-        await executeRecupEmails();
+        await executeMailSort();
         await initUnsortedMailsUI();
     } catch (error) {
         console.error("Erreur pendant le rechargement:", error);

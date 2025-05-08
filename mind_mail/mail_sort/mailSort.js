@@ -1,9 +1,9 @@
 import { extractNodeNames } from '../mind_map/saveMindMap.js';
 import { getSavedMindMap } from "../mind_map/loadMindMap.js";
 import { getAllTags } from "./extractTerminalNodesName.js";
-import { loadAndDisplayNotifications } from "../notification/notification_center.js";
-import { showMailPopup } from "../popup/popup.js";
-import { emptyTrashFolder } from "../trash/trash.js";
+import { loadAndDisplayNotifications } from "../web_interface/notification/notification_center.js";
+import { showMailPopup } from "../web_interface/popup/popup.js";
+import { emptyTrashFolder } from "./trash/trash.js";
 
 let accounts;
 let folderNodeMap = {};
@@ -11,7 +11,7 @@ let allCopiedIds = new Set();
 
 
 // Fonction principale qui initialise le système et lance la récupération des mails
-export async function executeRecupEmails() {
+export async function executeMailSort() {
 
     const mails = await getMailsFromFolder("");
     showMailPopup(mails, "");
@@ -457,10 +457,10 @@ export async function clearStoredFoldersData() {
 }
 
 
-// Déplace un mail depuis "Non Classé" vers un autre dossier de MindMail
-export async function moveMailFromUnsorted(mailId, targetPath) {
-    const unsortedPath = "MindMail/Non Classé";
-    const sourceFolderId = folderNodeMap[unsortedPath];
+// Déplace un mail d'id mailID depuis le dossier source vers le dossier cible
+export async function moveMailToFolder(mailId, sourcePath, targetPath) {
+    // Récupère les ID des dossiers source et cible
+    const sourceFolderId = folderNodeMap[sourcePath];
     const targetFolderId = folderNodeMap[targetPath];
     console.log("Source folderId:", sourceFolderId);
     console.log("Target folderId:", targetFolderId);
@@ -473,13 +473,13 @@ export async function moveMailFromUnsorted(mailId, targetPath) {
     }
 
     try {
-        // Liste les messages dans "Non Classé"
+        // Liste les messages du dossier source
         const sourceMessages = await getAllMessagesInFolder(sourceFolderId);
 
         const mail = sourceMessages.find(msg => msg.id === mailId);
 
         if (!mail) {
-            console.warn(`Le mail d'ID ${mailId} n'est pas dans 'Non Classé'.`);
+            console.warn(`Le mail d'ID ${mailId} n'est pas dans le dossier source.`);
             return;
         }
 
@@ -504,7 +504,7 @@ export async function moveMailFromUnsorted(mailId, targetPath) {
             console.log(`Mail déplacé vers '${targetPath}'`);
 
             // Supprime l'ancien ID de la liste du dossier source
-            await removeCopiedMailId(unsortedPath, mailId);
+            await removeCopiedMailId(sourcePath, mailId);
         }
 
     } catch (err) {

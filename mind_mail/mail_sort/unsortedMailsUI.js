@@ -1,7 +1,7 @@
 import { extractNodeNames } from '../mind_map/saveMindMap.js';
 import { getSavedMindMap } from "../mind_map/loadMindMap.js";
-import { moveMailFromUnsorted, getMindMailFolder, createMindMapFolders, getAllMessagesInFolder } from './recupMails.js';
-import { folderNodeMap } from '../mail_sort/recupMails.js';
+import { moveMailToFolder, getMindMailFolder, createMindMapFolders, getAllMessagesInFolder } from './mailSort.js';
+import { folderNodeMap } from './mailSort.js';
 
 let accounts;
 
@@ -140,7 +140,7 @@ function createMailItem(mail, folders, isNew = false) {
                 return;
             }
             
-            await moveMailFromUnsorted(mail.id, select.value);
+            await moveMailToFolder(mail.id, "MindMail/Non Classé", select.value);
             mailDiv.remove(); // Supprime l'élément            
             
             // Affiche une notification de succès
