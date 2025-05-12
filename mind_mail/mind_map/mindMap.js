@@ -8,7 +8,7 @@ import { showMailPopup } from '../web_interface/popup/popup.js';
 let mind;
 
 document.addEventListener("DOMContentLoaded", function () {
-    let mind = new MindElixir({
+    mind = new MindElixir({
         el: "#map",
         direction: MindElixir.SIDE,
         draggable: true,
@@ -64,9 +64,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
 export async function resetMindMap() {
     const newData = MindElixir.new("Nouvelle carte"); // Crée une nouvelle carte
-    mind.init(newData); // Réinitialise la carte mentale avec les données par défaut
+    window.mind.init(newData); // Réinitialise la carte mentale avec les données par défaut
     clearStoredFoldersData();
     saveMindMap(window.mind.getData()); // Sauvegarde la carte mentale
     console.log('Carte mentale réinitialisée.');
 }
-
