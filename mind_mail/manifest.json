@@ -33,8 +33,7 @@
       "tabs",
       "activeTab",
       "storage",
-      "notifications",
-      "messagesAttachments"
+      "notifications"
   ],
 
   "experiment_apis": {

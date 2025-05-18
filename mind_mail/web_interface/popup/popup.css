@@ -1,28 +1,20 @@
 #mailPopup {
-  width: 25vw; /* 25% de la largeur de l'écran */
-  height: 25vh; /* 25% de la hauteur de l'écran */
-  max-width: 90%; /* Limite la largeur à 90% de l'écran si nécessaire */
-  max-height: 90%; /* Limite la hauteur à 90% de l'écran si nécessaire */
+  position: absolute;
+  top: 40px;
+  top: 40px;
+  height: 71%;
+  width: 28.05%;
+  border: 1px solid #ddd;
   overflow-y: auto; /* Permet de défiler si le contenu dépasse la hauteur */
-  background-color: #fff;
-  border: 1px solid #ccc;
-  border-radius: 5px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  background: #f9fbfd;
+  border: 1px solid #cfd7df;
   padding: 15px;
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%); /* Centrer la popup */
-  z-index: 1000;
+  z-index: 1500;
 }
 
 #popupHeader {
   font-size: 18px;
-  margin-bottom: 15px;
-}
-
-#popupSearchContainer {
-  margin-bottom: 15px;
+  margin-bottom: 10px;
 }
 
 #popupSearchInput {
@@ -40,38 +32,76 @@
 }
 
 .mailCard {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
   padding: 10px;
   margin: 10px 0;
   border: 1px solid #ddd;
-  border-radius: 4px;
+  border-radius: 6px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.mailRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: flex-start;
+  width: 100%;
+  gap: 5px;
+  margin-bottom: 5px;
+}
+
+.iconContainer {
+  width: 30px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: flex-start;
+  height: 100%;
 }
 
 .mailIcon {
-  width: 30px;
-  height: 30px;
-  margin-right: 10px;
+  width: 24px;
+  height: 24px;
 }
 
-.mailSubject {
-  flex: 1;
+.attachmentIcon {
+  width: 20px;
+  height: 20px;
+  margin-top: auto;
+  align-self: flex-start;
+}
+
+.subjectContainer {
+  display: flex;
+  align-items: center;
   font-weight: bold;
+  font-size: 14px;
+  flex-grow: 1;
+  flex: 1;
 }
 
-.mailAuthor, .mailDate {
+.dateContainer {
+  display: flex;
+  justify-content: flex-end;
+  font-size: 12px;
+  color: #888;
+  flex-grow: 0.7;
+}
+
+.buttonContainer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  flex: 1;
+}
+
+.buttonContainer button {
+  font-size: 12px;
+  padding: 4px 8px;
+}
+
+.mailAuthor, 
+.mailDate {
   font-size: 12px;
   color: #888888;
-}
-
-button {
-  padding: 5px 10px;
-  margin-left: 5px;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-button:hover {
-  background-color: #f0f0f0;
 }

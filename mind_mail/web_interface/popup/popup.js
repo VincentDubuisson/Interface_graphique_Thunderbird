@@ -5,17 +5,65 @@ document.head.appendChild(style);
 
 // Fonction qui trouve le contenu des mails et l'affiche
 function findTextPart(parts) {
+  let plainPart = null;
+
   for (const part of parts) {
-    if (part.contentType?.includes("text/html") || part.contentType?.includes("text/plain")) {
+    const ct = part.contentType?.toLowerCase() || "";
+
+    // 1 - on renvoie tout de suite le HTML dès qu'on le trouve
+    if (ct.includes("text/html")) {
       return part;
     }
+    // 2 - mais on garde en mémoire le plain si jamais on ne trouve pas de HTML
+    if (!plainPart && ct.includes("text/plain")) {
+      plainPart = part;
+    }
+    // 3 - on descend récursivement
     if (part.parts) {
       const nested = findTextPart(part.parts);
-      if (nested) return nested;
+      if (nested) {
+        // si c'est du HTML, on remonte tout de suite
+        if (nested.contentType.toLowerCase().includes("text/html")) {
+          return nested;
+        }
+        // sinon on note éventuellement un plain imbriqué
+        if (!plainPart && nested.contentType.toLowerCase().includes("text/plain")) {
+          plainPart = nested;
+        }
+      }
     }
   }
-  return null;
+
+  // si pas de HTML, on renvoie le plain stocké (ou null)
+  return plainPart;
 }
+
+// Cherche une pièce jointe dans le mail
+function hasAttachment(parts) {
+  for (const part of parts) {
+    const type = part.contentType?.toLowerCase();
+    const dispo = part.contentDisposition?.toLowerCase();
+
+    // Si le type est un binaire, document ou image
+    const isAttachmentByType = type && (
+      type.startsWith("application/")
+    );
+
+    // Si marqué explicitement comme pièce jointe
+    const isAttachmentByDisposition = dispo === "attachment";
+
+    if (isAttachmentByType || isAttachmentByDisposition) {
+      return true;
+    }
+
+    // Recherche récursive
+    if (part.parts && hasAttachment(part.parts)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 
 export function showMailPopup(mails, keyword) {
   const existingPopup = document.getElementById("mailPopup");
@@ -27,7 +75,7 @@ export function showMailPopup(mails, keyword) {
   const header = document.createElement("div");
   header.id = "popupHeader";
   header.innerHTML = keyword
-    ? `<strong>Mails de ${keyword}</strong>`
+    ? `<strong>Mails de ${keyword} (${mails.length})</strong>`
     : `<strong>Tous les mails</strong>`;
   popup.appendChild(header);
 
@@ -43,29 +91,9 @@ export function showMailPopup(mails, keyword) {
       const mailCard = document.createElement("div");
       mailCard.className = "mailCard";
 
-      // Créer l'icône pour le mail envoyé ou reçu
-      const mailIcon = document.createElement("img");
-      mailIcon.className = "mailIcon";
-      if (mail.isSent) {
-        mailIcon.src = "../../../ressources/send.png"; // Icône pour les mails envoyés
-        console.log("Icône envoyée :", mailIcon.src);
-        mailIcon.alt = "Envoyé";
-      } else {
-        mailIcon.src = "../../../ressources/receive-mail.png"; // Icône pour les mails reçus
-        console.log("Icône reçue :", mailIcon.src);
-        mailIcon.alt = "Reçu";
-      }
-
-      // Ajouter l'icône à la carte du mail
-      mailCard.appendChild(mailIcon);
-
       const subject = document.createElement("div");
       subject.className = "mailSubject";
       subject.textContent = mail.subject || "(Pas de sujet)";
-
-      const author = document.createElement("div");
-      author.className = "mailAuthor";
-      author.textContent = mail.author || "";
 
       const date = document.createElement("div");
       date.className = "mailDate";
@@ -73,6 +101,10 @@ export function showMailPopup(mails, keyword) {
         const d = new Date(mail.date);
         date.textContent = `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
       }
+
+      const author = document.createElement("div");
+      author.className = "mailAuthor";
+      author.textContent = mail.author || "";
 
       const openBtn = document.createElement("button");
       openBtn.textContent = 'Ouvrir';
@@ -82,7 +114,6 @@ export function showMailPopup(mails, keyword) {
         active: true
       });
 
-      // BOUTON VOIR CONTENU MAIL
       const viewBtn = document.createElement("button");
       viewBtn.className = "viewMailButton";
       viewBtn.textContent = 'Voir Contenu';
@@ -114,13 +145,27 @@ export function showMailPopup(mails, keyword) {
             iframe.style.minHeight = "300px";
             iframe.style.border = "1px solid #ccc";
 
+            const parser = new DOMParser();
+            const doc    = parser.parseFromString(textPart.body, "text/html");
+            const head   = doc.querySelector("head")?.innerHTML || "";
+            const body   = doc.querySelector("body")?.innerHTML || "";
+
             bodyDiv.appendChild(iframe);
             mailCard.appendChild(bodyDiv);
 
             // Injecter le HTML dans l'iframe
             iframe.onload = () => {
               iframe.contentDocument.open();
-              iframe.contentDocument.write(textPart.body);
+              iframe.contentDocument.write(`
+                <!DOCTYPE html>
+                <html>
+                  <head>
+                    <meta charset="UTF-8">
+                    ${head}
+                  </head>
+                  <body>${body}</body>
+                </html>
+              `);
               iframe.contentDocument.close();
             };
           } else if (textPart && textPart.body) {
@@ -136,7 +181,74 @@ export function showMailPopup(mails, keyword) {
         }
       };
 
-      mailCard.append(subject, author, date, openBtn, viewBtn);
+      // Ajout de l’icône et du contenu à la carte
+      const mailIcon = document.createElement("img");
+      mailIcon.className = "mailIcon";
+      mailIcon.src = mail.isSent ? "../../../ressources/send.png" : "../../../ressources/receive-mail.png";
+      mailIcon.alt = mail.isSent ? "Envoyé" : "Reçu";
+
+      // Ligne 1
+      const row1 = document.createElement("div");
+      row1.className = "mailRow";
+
+      // Colonne 1 : icône (ligne 1)
+      const iconContainer = document.createElement("div");
+      iconContainer.className = "iconContainer";
+      iconContainer.appendChild(mailIcon);
+
+      // Colonne 2 : sujet (ligne 1)
+      const subjectContainer = document.createElement("div");
+      subjectContainer.className = "subjectContainer";
+      subjectContainer.appendChild(subject);
+
+      // Colonne 3 : date (ligne 1)
+      const dateContainer = document.createElement("div");
+      dateContainer.className = "dateContainer";
+      dateContainer.appendChild(date);
+
+      // Ligne 2
+      const row2 = document.createElement("div");
+      row2.className = "mailRow";
+
+      // Colonne 1 : vide (ligne 2, pour alignement)
+      const emptyCol = document.createElement("div");
+      emptyCol.className = "iconContainer"; // même taille que icône
+
+      browser.messages.getFull(mail.id).then(full => {
+        if (hasAttachment(full.parts || [])) {
+          const attachmentIcon = document.createElement("img");
+          attachmentIcon.src = "../../../ressources/trombone.png";
+          attachmentIcon.alt = "Pièce jointe";
+          attachmentIcon.className = "attachmentIcon";
+
+          emptyCol.appendChild(attachmentIcon);
+        }
+      });
+
+      // Colonne 2 : auteur (ligne 2)
+      const authorContainer = document.createElement("div");
+      authorContainer.className = "subjectContainer"; // même taille que sujet
+      authorContainer.appendChild(author);
+
+      // Colonne 3 : boutons (ligne 2)
+      const buttonsContainer = document.createElement("div");
+      buttonsContainer.className = "buttonContainer";
+      buttonsContainer.appendChild(openBtn);
+      buttonsContainer.appendChild(viewBtn);
+
+      // Ajout dans lignes
+      row1.appendChild(iconContainer);
+      row1.appendChild(subjectContainer);
+      row1.appendChild(dateContainer);
+
+      row2.appendChild(emptyCol);
+      row2.appendChild(authorContainer);
+      row2.appendChild(buttonsContainer);
+
+      // Ajout au mailCard
+      mailCard.appendChild(row1);
+      mailCard.appendChild(row2);
+
       mailList.appendChild(mailCard);
     });
   }
@@ -162,9 +274,11 @@ export function showMailPopup(mails, keyword) {
     mailCards.forEach(mailCard => {
       const subject = mailCard.querySelector(".mailSubject").textContent.toLowerCase();
       const author = mailCard.querySelector(".mailAuthor").textContent.toLowerCase();
+      const bodyElement = mailCard.querySelector(".mailBody");
+      const content = bodyElement ? bodyElement.textContent.toLowerCase() : "";
 
       // Afficher ou masquer la carte selon si le texte de la recherche correspond
-      if (subject.includes(searchQuery) || author.includes(searchQuery)) {
+      if (subject.includes(searchQuery) || author.includes(searchQuery) || content.includes(searchQuery)) {
         mailCard.style.display = "";
       } else {
         mailCard.style.display = "none";
