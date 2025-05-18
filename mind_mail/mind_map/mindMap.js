@@ -52,12 +52,26 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     mind.bus.addListener('selectNode', async node => {
-        console.log("Clic sur le noeud :", node)
-        const keyword = node.topic;
-        const response = await browser.runtime.sendMessage({
-            action: "getMailsByKeyword",
-            keyword: keyword
-        });
+        let keyword = node.topic;
+
+        // Vérifie si c'est la racine
+        const isRoot = node.parent == null;
+
+        let response;
+        if (isRoot) {
+            // Récupère tous les mails triés
+            response = await browser.runtime.sendMessage({
+                action: "getAllSortedMails"
+            });
+            keyword = null; // Pour afficher "Tous les mails" dans l'en-tête
+        } else {
+            // Récupère les mails filtrés par mot-clé
+            response = await browser.runtime.sendMessage({
+                action: "getMailsByKeyword",
+                keyword: keyword
+            });
+        }
+
         showMailPopup(response.messages || [], keyword);
     });
 });

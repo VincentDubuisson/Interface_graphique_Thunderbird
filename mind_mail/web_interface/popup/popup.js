@@ -76,7 +76,7 @@ export function showMailPopup(mails, keyword) {
   header.id = "popupHeader";
   header.innerHTML = keyword
     ? `<strong>Mails de ${keyword} (${mails.length})</strong>`
-    : `<strong>Tous les mails</strong>`;
+    : `<strong>Tous les mails (${mails.length})</strong>`;
   popup.appendChild(header);
 
   const mailList = document.createElement("div");

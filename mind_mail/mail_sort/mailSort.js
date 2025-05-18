@@ -1,9 +1,9 @@
 import { extractNodeNames } from '../mind_map/saveMindMap.js';
 import { getSavedMindMap } from "../mind_map/loadMindMap.js";
 import { getAllTags } from "./extractTerminalNodesName.js";
-import { loadAndDisplayNotifications } from "../web_interface/notification/notification_center.js";
 import { showMailPopup } from "../web_interface/popup/popup.js";
 import { emptyTrashFolder } from "./trash/trash.js";
+import { getAllSortedMessages } from "./getMail.js";
 
 let accounts;
 let folderNodeMap = {};
@@ -13,9 +13,6 @@ let allCopiedIds = new Set();
 // Fonction principale qui initialise le système et lance la récupération des mails
 export async function executeMailSort() {
 
-    const mails = await getMailsFromFolder("");
-    showMailPopup(mails, "");
-    
     await initAccount(); // Récupération des comptes mail disponibles
     const mindMailFolder = await initMainFolder();
 
@@ -62,13 +59,6 @@ export async function executeMailSort() {
 
     // Copie les mails non classés
     await handleUnsortedMails(allMails);
-
-    document.addEventListener('DOMContentLoaded', () => {
-        loadAndDisplayNotifications();
-    });
-
-    //await moveMailFromUnsorted(1548, "MindMail/Steam/Vente"); // Exemple d'utilisation du déplacement de mail non classé
-    
 }
 
 
@@ -262,7 +252,7 @@ async function createSubFolder(mailAdress = "none") {
         }
     }
 
-    const mindMailFolder = await getMindMailFolder(account); // Récupère ou crée le dossier MindMail
+    const mindMailFolder = await getMindMailFolder(account); // Récupère le dossier MindMail
     if (!mindMailFolder) {
         console.error("Dossier 'MindMail' introuvable !");
         return;

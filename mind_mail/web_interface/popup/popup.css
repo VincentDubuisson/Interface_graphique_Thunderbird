@@ -5,7 +5,7 @@
   height: 71%;
   width: 28.05%;
   border: 1px solid #ddd;
-  overflow-y: auto; /* Permet de défiler si le contenu dépasse la hauteur */
+  overflow-y: auto;  /* Permet de défiler si le contenu dépasse la hauteur */
   background: #f9fbfd;
   border: 1px solid #cfd7df;
   padding: 15px;
