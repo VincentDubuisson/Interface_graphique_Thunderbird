@@ -1,9 +1,7 @@
 import { extractNodeNames } from '../mind_map/saveMindMap.js';
 import { getSavedMindMap } from "../mind_map/loadMindMap.js";
 import { getAllTags } from "./extractTerminalNodesName.js";
-import { showMailPopup } from "../web_interface/popup/popup.js";
 import { emptyTrashFolder } from "./trash/trash.js";
-import { getAllSortedMessages } from "./getMail.js";
 
 let accounts;
 let folderNodeMap = {};
@@ -624,20 +622,35 @@ export async function getMailsFromFolder(folderName) {
             if (folder.name === "MindMail") {
                 const match = await findFolderIdByName(folder.subFolders, folderName);
                 if (match) {
-                    const page = await messenger.messages.list(match);
-                    const messages = page.messages || [];
-    
-                    for (let msg of messages) {
-                        results.push({
-                            subject: msg.subject,
-                            author: msg.author,
-                            id: msg.id,
-                            date: msg.date,
-                            folderId:{
-                                accountId: match.accountId,
-                                path: match.path,
+                    try {
+                        let page = await messenger.messages.list(match);
+
+                        while (page) {
+                            const messages = page.messages || [];
+
+                            for (let msg of messages) {
+                                results.push({
+                                    subject: msg.subject,
+                                    author: msg.author,
+                                    id: msg.id,
+                                    date: msg.date,
+                                    folderId: {
+                                        accountId: folder.accountId,
+                                        path: folder.path
+                                    }
+                                });
                             }
-                        });
+
+                            // Vérifie s'il y a d'autres pages de messages
+                            if (page.id) {
+                                page = await messenger.messages.continueList(page.id);
+                            } else {
+                                break; // Plus de messages à charger
+                            }
+                        }
+
+                    } catch (e) {
+                        console.warn(`Impossible de lire le dossier ${folder.name} :`, e);
                     }
                 }
             }
