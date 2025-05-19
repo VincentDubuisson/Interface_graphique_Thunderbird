@@ -139,8 +139,8 @@ export function showMailPopup(mails, keyword) {
           viewer.style.position = "fixed";
           viewer.style.top = "0";
           viewer.style.left = "0";
-          viewer.style.width = "50%";  //car 1/4 trop petit
-          viewer.style.height = "50%";  //same
+          viewer.style.width = "50%";
+          viewer.style.height = "95%";
           viewer.style.background = "white";
           viewer.style.border = "2px solid #ccc";
           viewer.style.boxShadow = "0 0 10px rgba(0,0,0,0.3)";
