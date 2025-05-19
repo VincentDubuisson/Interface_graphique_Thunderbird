@@ -107,18 +107,146 @@ export function showMailPopup(mails, keyword) {
       author.textContent = mail.author || "";
 
       const openBtn = document.createElement("button");
-      openBtn.textContent = 'Ouvrir';
-      openBtn.onclick = () => browser.messageDisplay.open({
-        messageId: mail.id,
-        location: 'tab',
-        active: true
-      });
+      openBtn.textContent = 'Afficher';
+      openBtn.onclick = async () => {
+        try {
+          // Supprimer les popups précédents s'il y en a
+          const existingViewer = document.getElementById("mailViewerPopup");
+          if (existingViewer) existingViewer.remove();
+
+          const fullMessage = await browser.messages.getFull(mail.id);
+          const textPart = findTextPart(fullMessage.parts || []);
+          
+          // ✅ Crée l’overlay pour bloquer le fond
+          const overlay = document.createElement("div");
+          overlay.id = "mailOverlay";
+          overlay.style.position = "fixed";
+          overlay.style.top = "0";
+          overlay.style.left = "0";
+          overlay.style.width = "100vw";
+          overlay.style.height = "100vh";
+          overlay.style.background = "rgba(0, 0, 0, 0.5)";
+          overlay.style.zIndex = 9998;
+          overlay.style.backdropFilter = "blur(2px)";
+          document.body.appendChild(overlay);
+          
+          // ✅ Désactive le scroll en arrière-plan
+          document.body.style.overflow = "hidden";
+          
+          // Créer la popup principale
+          const viewer = document.createElement("div");
+          viewer.id = "mailViewerPopup";
+          viewer.style.position = "fixed";
+          viewer.style.top = "0";
+          viewer.style.left = "0";
+          viewer.style.width = "50%";  //car 1/4 trop petit
+          viewer.style.height = "50%";  //same
+          viewer.style.background = "white";
+          viewer.style.border = "2px solid #ccc";
+          viewer.style.boxShadow = "0 0 10px rgba(0,0,0,0.3)";
+          viewer.style.zIndex = 9999;
+          viewer.style.overflow = "auto";
+          viewer.style.padding = "1rem";
+          viewer.style.display = "flex";
+          viewer.style.flexDirection = "column";
+
+          // ✅ Bouton Fermer
+            const closeBtn = document.createElement("button");
+            closeBtn.innerText = "Fermer";
+            closeBtn.style.alignSelf = "flex-end";
+            closeBtn.style.margin = "0.5rem";
+            closeBtn.onclick = () => {
+              document.body.style.overflow = "auto";
+              overlay.remove();
+              viewer.remove();
+            };
+
+                      // ✅ Ajout au DOM
+            document.body.appendChild(viewer);
+
+          // Titre / sujet
+          const title = document.createElement("h2");
+          title.textContent = mail.subject || "(Pas de sujet)";
+
+          // Auteur et date
+          const meta = document.createElement("div");
+          meta.innerHTML = `<strong>De :</strong> ${mail.author || "Inconnu"}<br><strong>Date :</strong> ${new Date(mail.date).toLocaleString()}`;
+
+          // Corps du mail
+          const content = document.createElement("div");
+          content.style.flex = "1";
+          content.style.marginTop = "1rem";
+          content.style.overflowY = "auto";
+          content.style.border = "1px solid #ddd";
+          content.style.padding = "0.5rem";
+
+          if (textPart && textPart.body && textPart.contentType.includes("text/html")) {
+            content.innerHTML = textPart.body;
+          } else {
+            content.innerHTML = `<pre>${textPart?.body || "Contenu vide."}</pre>`;
+          }
+
+          // Zone boutons actions
+          const actions = document.createElement("div");
+          actions.style.marginTop = "1rem";
+          actions.style.display = "flex";
+          actions.style.justifyContent = "space-between";
+
+          // Bouton Répondre
+          const replyBtn = document.createElement("button");
+          replyBtn.textContent = "Répondre";
+          replyBtn.onclick = () => browser.compose.beginReply(mail.id);
+
+          // Bouton Transférer
+          const forwardBtn = document.createElement("button");
+          forwardBtn.textContent = "Transférer";
+          forwardBtn.onclick = () => browser.compose.beginForward(mail.id);
+
+          // Bouton Déplacer
+          const moveBtn = document.createElement("button");
+          moveBtn.textContent = "Déplacer";
+          moveBtn.onclick = async () => {
+            try {
+              const accounts = await browser.accounts.list();
+              const folders = accounts.flatMap(acc => acc.folders || []);
+              const folderName = prompt("Nom du dossier où déplacer le message :", folders[0]?.name || "");
+              const destination = folders.find(f => f.name === folderName);
+              if (destination) {
+                await browser.messages.move([mail.id], destination);
+                alert(`Message déplacé vers ${folderName}`);
+                viewer.remove();
+              } else {
+                alert("Dossier introuvable.");
+              }
+            } catch (err) {
+              console.error("Erreur de déplacement :", err);
+              alert("Erreur lors du déplacement.");
+            }
+          };
+
+          actions.appendChild(replyBtn);
+          actions.appendChild(forwardBtn);
+          actions.appendChild(moveBtn);
+
+          // Assembler la popup
+          viewer.appendChild(closeBtn);
+          viewer.appendChild(title);
+          viewer.appendChild(meta);
+          viewer.appendChild(content);
+          viewer.appendChild(actions);
+
+
+        } catch (error) {
+          console.error("Erreur lors de l'ouverture du mail :", error);
+          alert("Erreur lors de l'ouverture du mail.");
+        }
+      };
 
       const viewBtn = document.createElement("button");
       viewBtn.className = "viewMailButton";
       viewBtn.textContent = 'Voir Contenu';
       viewBtn.onclick = async () => {
-        const existingBody = mailCard.querySelector(".mailBody");
+      const existingBody = mailCard.querySelector(".mailBody");
 
         // Toggle : si le contenu est déjà là, on le retire
         if (existingBody) {
