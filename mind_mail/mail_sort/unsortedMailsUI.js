@@ -235,8 +235,6 @@ async function initUnsortedMailsUI() {
     try {
         // Récupère les dossiers disponibles
         let folders = Object.keys(folderNodeMap);
-        folders = folders.map(f => f.replace(/^\/+/, ''));
-        folders = [...new Set(folders)];
         if (folders.length === 0) {
             console.log("Folder map empty, reloading MindMap...");
 
