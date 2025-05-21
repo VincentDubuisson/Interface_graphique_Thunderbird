@@ -37,12 +37,12 @@ export async function executeMailSort() {
         await initAccount();
         await initMainFolder(); // Création du dossier principal "MindMail"
         await saveTags(currentTags); // Sauvegarde des nouveaux tags
+        await createSubFolder(); // Création de la structure de dossiers en fonction de la carte mentale
     } else {
         console.log("Structure MindMail correcte, pas de nettoyage nécessaire.");
         await loadAllPreviouslyCopiedIds();
     }
 
-    await createSubFolder(); // Création de la structure de dossiers en fonction de la carte mentale
 
     // Chargement de la carte mentale sauvegardée
     const mindMapData = await getSavedMindMap();
@@ -53,10 +53,7 @@ export async function executeMailSort() {
     console.log(`Nombre total de mails récupérés : ${allMails.length}`);
 
     // Lance le parcours de la carte mentale pour trier les mails
-    await browseNode(mindMapData.nodeData, allMails, "MindMail", true);
-
-    // Copie les mails non classés
-    await handleUnsortedMails(allMails);
+    await mailSort(mindMapData, allMails);
 }
 
 
@@ -109,92 +106,197 @@ async function getAllMails() {
 }
 
 
-// Parcourt récursivement les nœuds de la carte mentale pour filtrer et copier les mails selon les tags définis
-async function browseNode(node, baseMails, path = "", isRoot = false) {
-    const normalizeTag = tag => tag.trim().toLowerCase(); // Normalise les tags pour comparaison
-    const ownTags = (node.tags || []).map(normalizeTag); // Récupère les tags du nœud courant
-    const hasTags = ownTags.length > 0; // Vérifie s'il y a des tags à utiliser pour le filtrage
+async function mailSort(mindMapData, allMails) {
+    console.log("Lancement du tri des mails...");
+    const accounts = await browser.accounts.list();
+    const lastAccount = accounts[accounts.length - 1]; // "Dossiers locaux"
+    const accountName = lastAccount.name;
 
-    let totalMessages = 0;
-    const filteredMails = [];
+    const folderNodeMap = {};
+    async function buildFolderMap(folder, prefix = folder.name) {
+        const path = `${accountName}/${prefix}`;
+        folderNodeMap[path] = folder;
 
-    const nodePath = isRoot ? "MindMail" : `${path}${node.topic}`; // Construit le chemin vers le dossier
-    const fullPath = `${nodePath}`;
-    const folderId = folderNodeMap[`${nodePath}`] || folderNodeMap[`Dossiers locaux/${nodePath}`]; // Recherche le dossier cible
-    const alreadyCopiedIds = folderId ? await loadCopiedMailIds(fullPath) : []; // Charge les IDs de mails déjà copiés
-
-    if (hasTags) {
-        for (let mail of baseMails) {
-            const subject = mail.subject?.toLowerCase() || "";
-            const author = mail.author?.toLowerCase() || "";
-
-            let bodyText = "";
-            try {
-                const fullMessage = await browser.messages.getFull(mail.id);
-                const parts = fullMessage.parts || [];
-                
-                // Recherche la première partie de type text/plain
-                for (let part of parts) {
-                    if (part.contentType === "text/plain" && part.body) {
-                        bodyText = part.body.toLowerCase();
-                        break;
-                    }
-                }
-            } catch (err) {
-                console.warn(`Erreur lors de la récupération du contenu du mail ${mail.id} :`, err);
+        if (folder.subFolders) {
+            for (const sub of folder.subFolders) {
+                await buildFolderMap(sub, `${prefix}/${sub.name}`);
             }
+        }
+    }
 
-            // Vérifie si le mail correspond à au moins un tag
-            const hasMatchingTag = ownTags.some(tag =>
-                tag === "all" ||
-                subject.includes(tag) ||
-                author.includes(tag) ||
-                bodyText.includes(tag)
+    for (const folder of lastAccount.folders) {
+        await buildFolderMap(folder);
+    }
+
+    console.log("Arborescence des dossiers indexée:");
+    for (const key in folderNodeMap) {
+        console.log(`   - ${key}`);
+    }
+
+    const tagNodeMap = indexNodesByTags(mindMapData.nodeData);
+    const allTagSet = new Set(tagNodeMap.keys());
+
+    console.log("Index des tags construit:");
+    for (const [tag, paths] of tagNodeMap.entries()) {
+        console.log(`   - ${tag}: ${Array.from(paths).join(", ")}`);
+    }
+
+    const normalize = str => str?.toLowerCase().trim() || "";
+    const copiedCache = {};
+    const fullPathNonClasse = `${accountName}/MindMail/Non Classé`;
+    const folderNonClasse = folderNodeMap[fullPathNonClasse];
+
+    if (!folderNonClasse) {
+        console.warn(`Dossier 'Non Classé' introuvable à "${fullPathNonClasse}"`);
+    }
+
+    for (const mail of allMails) {
+        const subject = normalize(mail.subject);
+        const author = normalize(mail.author);
+
+        let bodyText = "";
+        try {
+            const fullMessage = await browser.messages.getFull(mail.id);
+            for (const part of fullMessage.parts || []) {
+                if (part.contentType === "text/plain" && part.body) {
+                    bodyText = normalize(part.body);
+                    break;
+                }
+            }
+        } catch (err) {
+        }
+
+        const matchedPaths = new Set();
+
+        for (const [nodePath, tagInfo] of tagNodeMap.entries()) {
+            const { inheritedTags, ownTags, isDirectChildOfRoot } = tagInfo;
+
+            const hasOwnTagMatch = [...ownTags].some(tag =>
+                subject.includes(tag) || author.includes(tag) || bodyText.includes(tag)
             );
 
-            if (hasMatchingTag) {
-                // Ignore les mails déjà copiés
-                if (alreadyCopiedIds.includes(mail.id)) {
-                    continue;
-                }
+            let match = false;
 
-                console.log(`     ${mail.subject} - ${mail.author}`);
-                filteredMails.push(mail);
-                totalMessages++;
+            if (isDirectChildOfRoot) {
+                match = hasOwnTagMatch;
+            } else {
+                const hasInheritedMatch = [...inheritedTags].some(tag =>
+                    subject.includes(tag) || author.includes(tag) || bodyText.includes(tag)
+                );
+                match = hasOwnTagMatch && hasInheritedMatch;
+            }
 
-                // Copie le mail dans le dossier et enregistre son ID
-                if (folderId) {
-                    try {
-                        await browser.messages.copy([mail.id], folderId);
-                        await saveCopiedMailId(fullPath, mail.id);
-                        allCopiedIds.add(mail.id);
-                        console.log(`    Copié dans '${fullPath}'`);
-                    } catch (copyError) {
-                        console.error(`Erreur lors de la copie dans '${fullPath}' :`, copyError);
-                    }
-                } else {
-                    console.warn(`Dossier introuvable pour '${fullPath}'`);
-                }
+            if (match) {
+                matchedPaths.add(nodePath);
             }
         }
 
-        if (totalMessages > 0) {
-            console.log(`"${node.topic}" (${ownTags.join(", ")}) → ${totalMessages} nouveaux mails.`);
-        } else {
-            console.log(`Aucun nouveau mail pour "${node.topic}"`);
+
+        // Aucune correspondance avec un tag : copier dans "Non Classé"
+        if (matchedPaths.size === 0) {
+            if (!folderNonClasse) {
+                continue;
+            }
+
+            const nodePath = "MindMail/Non Classé";
+            if (!copiedCache[nodePath]) {
+                const loadedIds = await loadCopiedMailIds(nodePath);
+                console.log(`Mails déjà copiés pour ${nodePath} : ${loadedIds.length}`);
+
+                copiedCache[nodePath] = new Set(loadedIds);
+            }
+
+            if (copiedCache[nodePath].has(mail.id)) {
+                continue;
+            }
+
+            try {
+                console.log(`Non Classé -> ${mail.subject} - <${mail.author}>`)
+                await browser.messages.copy([mail.id], folderNonClasse.id);
+                await saveCopiedMailId(nodePath, mail.id);
+                copiedCache[nodePath].add(mail.id);
+                allCopiedIds.add(mail.id);
+                await storeNotification({
+                    subject: mail.subject,
+                    author: mail.author,
+                    messageId: mail.id,
+                    date: mail.date
+                });
+            } catch (err) {
+                console.error(`Erreur de copie de "${mail.subject}" - <${mail.author}> dans "Non Classé": ${err}`);
+            }
+            continue;
         }
-    } else {
-        // S'il n'y a pas de tags, on transmet tous les mails aux enfants
-        filteredMails.push(...baseMails);
-        console.log(`"${node.topic}" sans tag → mails transmis aux enfants`);
+
+        // Sinon, on copie dans tous les dossiers liés aux tags
+        for (const nodePath of matchedPaths) {
+            const fullPath = `${accountName}/${nodePath}`;
+            const folder = folderNodeMap[fullPath];
+
+            if (!folder) {
+                continue;
+            }
+
+            if (!copiedCache[nodePath]) {
+                const loadedIds = await loadCopiedMailIds(nodePath);
+                copiedCache[nodePath] = new Set(loadedIds);
+            }
+
+            if (copiedCache[nodePath].has(mail.id)) {
+                continue;
+            }
+
+            console.log("Chargement des mails déjà copiés pour tous les dossiers :");
+            for (const path in copiedCache) {
+                console.log(`${path} -> ${copiedCache[path].size} mails`);
+            }
+
+
+            try {
+                console.log(`${nodePath} -> ${mail.subject} - <${mail.author}>`)
+                await browser.messages.copy([mail.id], folder.id);
+                await saveCopiedMailId(nodePath, mail.id);
+                copiedCache[nodePath].add(mail.id);
+                allCopiedIds.add(mail.id);
+            } catch (e) {
+                console.error(`Erreur de copie de "${mail.subject}" - <${mail.author}> dans "${nodePath}":`, e);
+            }
+        }
+    }
+    console.log("Tous les mails ont été triés.");
+}
+
+
+function indexNodesByTags(node, path = "MindMail", tagMap = new Map(), isRoot = true, inheritedTags = new Set(), isDirectChild = false) {
+    const normalize = tag => tag.trim().toLowerCase();
+    const nodePath = isRoot ? path : `${path}/${node.topic}`.replace(/\/+/, '/');
+
+    const ownTags = new Set();
+    if (!isRoot && Array.isArray(node.tags)) {
+        for (const rawTag of node.tags) {
+            ownTags.add(normalize(rawTag));
+        }
     }
 
-    // Parcours récursif des nœuds enfants
+    if (!isRoot) {
+        tagMap.set(nodePath, {
+            inheritedTags: new Set(inheritedTags),
+            ownTags,
+            isDirectChildOfRoot: isDirectChild
+        });
+    }
+
+    const nextInherited = new Set(inheritedTags);
+    ownTags.forEach(tag => nextInherited.add(tag));
+
     if (node.children && node.children.length > 0) {
-        for (let child of node.children) {
-            await browseNode(child, filteredMails, `${nodePath}/`);
+        for (const child of node.children) {
+            // Si ici on est à la racine, les enfants seront des enfants directs de la racine
+            indexNodesByTags(child, nodePath, tagMap, false, nextInherited, isRoot);
         }
     }
+
+    return tagMap;
 }
 
 
@@ -340,54 +442,6 @@ async function clearNotifications() {
 }
 
 
-// Copie les mails non triés dans le dossier "Non Classé" s'ils ne sont liés à aucun tag
-async function handleUnsortedMails(allMails) {
-
-    const fullPath = "MindMail/Non Classé";
-    const folderId = folderNodeMap[fullPath]; // Récupère l’ID du dossier "Non Classé"
-
-
-    const unclassifiedMails = allMails.filter(mail => !allCopiedIds.has(mail.id)); // Garde uniquement les mails encore non copiés
-    if (unclassifiedMails.length === 0) {
-        console.log("Tous les mails ont été triés.");
-        return;
-    }
-
-    if (!folderId) {
-        console.warn("Dossier 'Non Classé' introuvable !");
-        return;
-    }
-
-    for (let mail of unclassifiedMails) {
-        try {
-            await browser.messages.copy([mail.id], folderId); // Copie le mail
-            await saveCopiedMailId(fullPath, mail.id); // Enregistre son ID pour ne pas le copier à nouveau
-            allCopiedIds.add(mail.id);
-            console.log(`Mail non classé copié : ${mail.subject}`);
-
-            await storeNotification({
-                subject: mail.subject,
-                author: mail.author,
-                messageId: mail.id,
-                date: mail.date
-            });
-
-        } catch (err) {
-            console.error("Erreur copie mail non classé :", err);
-        }
-    }
-
-    console.log(`${unclassifiedMails.length} mail(s) copié(s) dans 'Non Classé'`);
-}
-
-
-// Récupère les ID des mails classés
-async function loadCopiedMailIds(folderPath) {
-    const result = await browser.storage.local.get(folderPath);
-    return result[folderPath] || [];
-}
-
-
 async function loadAllPreviouslyCopiedIds() {
     const allData = await browser.storage.local.get(null);
     for (const [key, value] of Object.entries(allData)) {
@@ -401,12 +455,21 @@ async function loadAllPreviouslyCopiedIds() {
 
 
 // Sauvegarde les ID des mails classés
-async function saveCopiedMailId(folderPath, messageId) {
-    const current = await loadCopiedMailIds(folderPath);
-    if (!current.includes(messageId)) {
-        current.push(messageId);
-        await browser.storage.local.set({ [folderPath]: current });
+export async function saveCopiedMailId(nodePath, mailId) {
+    const key = `copied_${encodeURIComponent(nodePath)}`;
+    const result = await browser.storage.local.get(key);
+    const existing = result[key] || [];
+    if (!existing.includes(mailId)) {
+        existing.push(mailId);
+        await browser.storage.local.set({ [key]: existing });
     }
+}
+
+// Récupère les ID des mails classés
+export async function loadCopiedMailIds(nodePath) {
+    const key = `copied_${encodeURIComponent(nodePath)}`;
+    const result = await browser.storage.local.get(key);
+    return result[key] || [];
 }
 
 
@@ -430,7 +493,7 @@ export async function clearStoredFoldersData() {
 
         // Nettoyage du stockage local
         const allData = await browser.storage.local.get(null); // Récupère tout
-        const keysToDelete = Object.keys(allData).filter(key => key.startsWith("MindMail/"));
+        const keysToDelete = Object.keys(allData).filter(key => key.startsWith("copied_"));
         for (let key of keysToDelete) {
             await browser.storage.local.remove(key);
             console.log(`Données supprimées pour le dossier : ${key}`);
