@@ -267,7 +267,13 @@ function createViewButton(mail, mailCard) {
         const replyBtnInline = document.createElement("button");
         replyBtnInline.textContent = "Répondre";
         replyBtnInline.style.marginTop = "10px";
-        replyBtnInline.onclick = () => browser.compose.beginReply(mail.id);
+
+        if (mail.isSent) {
+          replyBtnInline.disabled = true;
+          replyBtnInline.title = "Message envoyé – pas de réponse possible";
+        } else {
+          replyBtnInline.onclick = () => browser.compose.beginReply(mail.id);
+        }
 
         bodyDiv.appendChild(replyBtnInline);
         mailCard.appendChild(bodyDiv);
@@ -372,9 +378,13 @@ function createMailViewer(mail, textPart) {
 
   // Repondre button
   const replyBtn = document.createElement("button");
-  replyBtn.textContent = "Répondre";
+  replyBtn.textContent="Répondre";
+ if (mail.isSent) {
+  replyBtn.disabled = true;
+  replyBtn.title = "Message envoyé – pas de réponse possible";
+} else {
   replyBtn.onclick = () => browser.compose.beginReply(mail.id);
-
+}
   // Transferer button
   const forwardBtn = document.createElement("button");
   forwardBtn.textContent = "Transférer";
@@ -385,9 +395,29 @@ function createMailViewer(mail, textPart) {
   moveBtn.textContent = "Déplacer";
   moveBtn.onclick = () => createMoveDialog(mail, viewer, overlay);
 
+
+  // Supprimer button
+  const deleteBtn = document.createElement("button");
+  deleteBtn.textContent = "Supprimer";
+  deleteBtn.onclick = async () => {
+    const confirmation = confirm("Voulez-vous vraiment supprimer ce message ?");
+    if (!confirmation) return;
+
+    try {
+      await browser.messages.delete([mail.id], true); // true = vers la corbeille
+      closeBtn.click();
+      viewer.remove(); // ferme la popup
+      browser.runtime.sendMessage({ action: "refreshMailList" }); // actualise la liste
+    } catch (error) {
+      console.error("Erreur lors de la suppression :", error);
+      alert("Erreur lors de la suppression du message.");
+    }
+  };
+
   actions.appendChild(replyBtn);
   actions.appendChild(forwardBtn);
   actions.appendChild(moveBtn);
+  actions.appendChild(deleteBtn);
 
   // Assemble viewer
   viewer.appendChild(closeBtn);
