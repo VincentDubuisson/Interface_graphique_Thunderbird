@@ -39,10 +39,12 @@ export async function executeMailSort() {
         await saveTags(currentTags); // Sauvegarde des nouveaux tags
         await createSubFolder(); // Création de la structure de dossiers en fonction de la carte mentale
     } else {
-        console.log("Structure MindMail correcte, pas de nettoyage nécessaire.");
+        console.log("[STATUT] Structure MindMail valide");
+        console.log(`[DEBUG] Tags stockés : ${JSON.stringify(savedTags)}`);
+        console.log(`[DEBUG] Tags actuels : ${JSON.stringify(currentTags)}`);
         await loadAllPreviouslyCopiedIds();
+        console.log(`[DEBUG] IDs en mémoire après chargement : ${allCopiedIds.size}`);
     }
-
 
     // Chargement de la carte mentale sauvegardée
     const mindMapData = await getSavedMindMap();
@@ -153,6 +155,12 @@ async function mailSort(mindMapData, allMails) {
     for (const mail of allMails) {
         const subject = normalize(mail.subject);
         const author = normalize(mail.author);
+
+        console.log(`[TRAITEMENT] Vérification du mail ${mail.id}...`);
+        if (allCopiedIds.has(mail.id)) {
+            console.log(`[SKIP] Mail ${mail.id} déjà traité`);
+            continue;
+        }
 
         let bodyText = "";
         try {
@@ -443,14 +451,19 @@ async function clearNotifications() {
 
 
 async function loadAllPreviouslyCopiedIds() {
+    console.log("[DEBUG] Chargement des IDs précédemment copiés...");
     const allData = await browser.storage.local.get(null);
+    let totalLoaded = 0;
     for (const [key, value] of Object.entries(allData)) {
-        if (key.startsWith("MindMail/") && Array.isArray(value)) {
+        if (key.startsWith("copied_") && Array.isArray(value)) {
+            console.log(`[DEBUG] Dossier trouvé : ${key} (${value.length} IDs)`);
+            totalLoaded += value.length;
             for (const id of value) {
                 allCopiedIds.add(id);
             }
         }
     }
+    console.log(`[DEBUG] Total IDs chargés depuis le stockage : ${totalLoaded}`);
 }
 
 
@@ -463,6 +476,7 @@ export async function saveCopiedMailId(nodePath, mailId) {
         existing.push(mailId);
         await browser.storage.local.set({ [key]: existing });
     }
+    console.log(`[SAUVEGARDE] Stockage ID ${mailId} pour ${nodePath}`);
 }
 
 // Récupère les ID des mails classés
